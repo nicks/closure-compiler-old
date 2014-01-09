@@ -56,6 +56,7 @@ public class ProcessCommonJSModules implements CompilerPass {
   private final ES6ModuleLoader loader;
   private final boolean reportDependencies;
   private JSModule module;
+  private CompilerInput currentInput;
 
   ProcessCommonJSModules(Compiler compiler, ES6ModuleLoader loader) {
     this(compiler, loader, true);
@@ -69,11 +70,12 @@ public class ProcessCommonJSModules implements CompilerPass {
   }
 
   void process(CompilerInput input) {
-    compiler.putCompilerInput(input.getInputId(), input);
+    currentInput = input;
     Node root = input.getAstRoot(compiler);
     if (!compiler.hasHaltingErrors()) {
       process(null, root);
     }
+    currentInput = null;
   }
 
   @Override
@@ -148,11 +150,19 @@ public class ProcessCommonJSModules implements CompilerPass {
      */
     private void visitRequireCall(NodeTraversal t, Node require, Node parent) {
       String requireName = require.getChildAtIndex(1).getString();
-      String loadAddress = loader.locate(requireName, t.getInput());
+      String loadAddress = loader.locate(requireName, getInput(t));
+      boolean loadSuccess = false;
       try {
-        loader.load(loadAddress);
-      } catch (ES6ModuleLoader.LoadFailedException e) {
-        t.makeError(require, LOAD_ERROR, requireName);
+        if (loadAddress != null) {
+          loader.load(loadAddress);
+          loadSuccess = true;
+        }
+      } catch (ES6ModuleLoader.LoadFailedException e) {}
+
+      if (!loadSuccess) {
+        compiler.report(t.makeError(require, LOAD_ERROR, requireName));
+        parent.removeChild(require);
+        return;
       }
 
       String moduleName = toModuleName(loadAddress);
@@ -160,13 +170,17 @@ public class ProcessCommonJSModules implements CompilerPass {
       parent.replaceChild(require, moduleRef);
       Node script = getCurrentScriptNode(parent);
       if (reportDependencies) {
-        t.getInput().addRequire(moduleName);
+        getInput(t).addRequire(moduleName);
       }
       // Rewrite require("name").
       script.addChildToFront(IR.exprResult(
           IR.call(IR.getprop(IR.name("goog"), IR.string("require")),
               IR.string(moduleName))).copyInformationFromForTree(require));
       compiler.reportCodeChange();
+    }
+
+    private CompilerInput getInput(NodeTraversal t) {
+      return currentInput == null ? t.getInput() : currentInput;
     }
 
     /**
@@ -179,7 +193,7 @@ public class ProcessCommonJSModules implements CompilerPass {
           "CompilerInput / script node");
 
       String moduleName = toModuleName(
-          loader.getLoadAddress(t.getInput()));
+          loader.getLoadAddress(getInput(t)));
 
       // Rename vars to not conflict in global scope.
       NodeTraversal.traverse(compiler, script, new SuffixVarsCallback(
@@ -192,7 +206,7 @@ public class ProcessCommonJSModules implements CompilerPass {
 
       // Add goog.provide calls.
       if (reportDependencies) {
-        CompilerInput ci = t.getInput();
+        CompilerInput ci = getInput(t);
         ci.addProvide(moduleName);
         JSModule m = new JSModule(moduleName);
         m.addAndOverrideModule(ci);

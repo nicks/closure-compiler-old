@@ -1,0 +1,15 @@
+#!/usr/bin/env node
+
+var path = require('path')
+var cp = require('child_process')
+
+var binPath = path.join(__dirname, '..', 'lib', 'closure-npc.jar')
+var child = cp.spawn(
+    'java',
+    ['-jar', binPath].concat(process.argv.slice(2)),
+    {stdio: 'inherit'})
+
+child.on('error', function (err) {
+  console.error('Error executing closure-npc', binPath)
+  console.error(err.stack || err)
+})

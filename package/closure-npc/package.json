@@ -1,0 +1,21 @@
+{
+  "name": "closure-npc",
+  "description": "Closure Node Package Checker, a type-checker for NodeJS programs",
+  "version": "0.1.0",
+  "homepage": "https://github.com/nicks/closure-compiler/tree/nick-npm/package/closure-npc",
+  "authors": [
+    "Nick Santos (nicholas.j.santos@gmail.com)"
+  ],
+  "keywords": ["closure-compiler", "types", "type-checking"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nicks/closure-compiler.git"
+  },
+  "bin": {
+    "closure-npc": "./bin/closure-npc"
+  },
+  "scripts": {
+    "test": "cd ../../ && ant test",
+    "prepublish": "./prepublish.sh"
+  }
+}

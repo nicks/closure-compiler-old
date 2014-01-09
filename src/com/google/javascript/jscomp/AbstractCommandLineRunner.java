@@ -519,8 +519,8 @@ abstract class AbstractCommandLineRunner<A extends Compiler,
       String name = parts[0];
       checkModuleName(name);
       if (modulesByName.containsKey(name)) {
-              throw new FlagUsageException("Duplicate module name: " + name);
-          }
+        throw new FlagUsageException("Duplicate module name: " + name);
+      }
       JSModule module = new JSModule(name);
 
       // Parse module inputs.

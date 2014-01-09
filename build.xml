@@ -40,6 +40,7 @@
   <property name="gen.dir" value="${basedir}/gen" />
   <property name="test.dir" value="${basedir}/test" />
   <property name="externs.dir" value="${basedir}/externs" />
+  <property name="nodejs.dir" value="${basedir}/contrib/nodejs" />
   <!-- To workaround Ant limitation on overriding properties set on the
        command-line, define a unique property to allow "build.dir" to
        be change without forcing the build of Rhino to the same directory.
@@ -54,6 +55,8 @@
   <property name="tools.dir" value="${basedir}/tools" />
   <property name="compiler-jarfile"
             value="${build.dir}/${ant.project.name}.jar" />
+  <property name="npm-compiler-jarfile"
+            value="${build.dir}/closure-npc.jar" />
   <property name="num-fuzz-tests" value="10000"/>
 
   <property name="webservice.dir" value="${basedir}/src/com/google/javascript/jscomp/webservice" />
@@ -291,7 +294,7 @@
   <target name="jar-nodeps"
           depends="compile,pom"
           description="package compiler as an executable jar">
-    <zip destfile="${build.dir}/externs.zip" basedir="${externs.dir}" />
+    <zip destfile="${build.dir}/externs.zip" basedir="${externs.dir}" includes="**/*.js" />
     <jar destfile="${compiler-jarfile-nodeps}" update="true">
       <fileset dir="${classes.dir}" />
       <fileset dir="${build.dir}" includes="externs.zip" />
@@ -303,7 +306,7 @@
   <target name="jar"
           depends="compile"
           description="package compiler as an executable jar">
-    <zip destfile="${build.dir}/externs.zip" basedir="${externs.dir}" includes="*.js" />
+    <zip destfile="${build.dir}/externs.zip" basedir="${externs.dir}" includes="**/*.js" />
     <jar destfile="${compiler-jarfile}" update="true">
       <fileset dir="${classes.dir}" />
       <fileset dir="${build.dir}" includes="externs.zip" />
@@ -318,6 +321,30 @@
       <manifest>
         <attribute name="Main-Class"
                    value="com.google.javascript.jscomp.CommandLineRunner" />
+      </manifest>
+    </jar>
+  </target>
+
+  <target name="closure-npc"
+          depends="compile"
+          description="package closure-npc as an executable jar">
+    <zip destfile="${build.dir}/externs.zip" basedir="${externs.dir}" includes="**/*.js" />
+    <zip destfile="${build.dir}/nodejs.zip" basedir="${nodejs.dir}" includes="**/*.js" />
+    <jar destfile="${npm-compiler-jarfile}" update="true">
+      <fileset dir="${classes.dir}" />
+      <fileset dir="${build.dir}" includes="externs.zip" />
+      <fileset dir="${build.dir}" includes="nodejs.zip" />
+      <zipfileset src="${lib.dir}/args4j.jar"/>
+      <zipfileset src="${lib.dir}/guava.jar"/>
+      <zipfileset src="${lib.dir}/json.jar"/>
+      <zipfileset src="${lib.dir}/jsr305.jar"/>
+      <zipfileset src="${lib.dir}/protobuf-java.jar"/>
+
+      <zipfileset src="${buildlib.dir}/rhino.jar"/>
+
+      <manifest>
+        <attribute name="Main-Class"
+                   value="com.google.javascript.jscomp.NpmCommandLineRunner" />
       </manifest>
     </jar>
   </target>
@@ -479,7 +506,7 @@
   <target name="webservice-jar"
           description="package the compiler and Webservice classes"
           depends="webservice-compile, compile">
-   <zip destfile="${build.dir}/externs.zip" basedir="${externs.dir}" includes="*.js" />
+   <zip destfile="${build.dir}/externs.zip" basedir="${externs.dir}" includes="**/*.js" />
    <jar destfile="${webservice-jarfile}" update="true">
      <zipgroupfileset dir="${lib.dir}" includes="*.jar"/>
      <zipfileset src="${buildlib.dir}/rhino.jar"/>

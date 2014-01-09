@@ -18,6 +18,7 @@ package com.google.javascript.jscomp;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -104,11 +105,132 @@ public class CommandLineRunner extends
     }
   }
 
+  /**
+   * Encapsulates all our private helper classes for parsing flags.
+   */
+  static class AbstractFlags {
+    static List<GuardLevel> guardLevels = Lists.newArrayList();
+
+    // Our own option parser to be backwards-compatible.
+    // It needs to be public because of the crazy reflection that args4j does.
+    public static class BooleanOptionHandler extends OptionHandler<Boolean> {
+      private static final Set<String> TRUES =
+          Sets.newHashSet("true", "on", "yes", "1");
+      private static final Set<String> FALSES =
+          Sets.newHashSet("false", "off", "no", "0");
+
+      public BooleanOptionHandler(
+          CmdLineParser parser, OptionDef option,
+          Setter<? super Boolean> setter) {
+        super(parser, option, setter);
+      }
+
+      @Override
+      public int parseArguments(Parameters params) throws CmdLineException {
+        String param = null;
+        try {
+          param = params.getParameter(0);
+        } catch (CmdLineException e) {
+          param = null; // to stop linter complaints
+        }
+
+        if (param == null) {
+          setter.addValue(true);
+          return 0;
+        } else {
+          String lowerParam = param.toLowerCase();
+          if (TRUES.contains(lowerParam)) {
+            setter.addValue(true);
+          } else if (FALSES.contains(lowerParam)) {
+            setter.addValue(false);
+          } else {
+            setter.addValue(true);
+            return 0;
+          }
+          return 1;
+        }
+      }
+
+      @Override
+      public String getDefaultMetaVariable() {
+        return null;
+      }
+    }
+
+    // Our own parser for warning guards that preserves the original order
+    // of the flags.
+    public static class WarningGuardErrorOptionHandler
+        extends StringOptionHandler {
+      public WarningGuardErrorOptionHandler(
+          CmdLineParser parser, OptionDef option,
+          Setter<? super String> setter) {
+        super(parser, option, new WarningGuardSetter(setter, CheckLevel.ERROR));
+      }
+    }
+
+    public static class WarningGuardWarningOptionHandler
+        extends StringOptionHandler {
+      public WarningGuardWarningOptionHandler(
+          CmdLineParser parser, OptionDef option,
+          Setter<? super String> setter) {
+        super(parser, option,
+            new WarningGuardSetter(setter, CheckLevel.WARNING));
+      }
+    }
+
+    public static class WarningGuardOffOptionHandler
+        extends StringOptionHandler {
+      public WarningGuardOffOptionHandler(
+          CmdLineParser parser, OptionDef option,
+          Setter<? super String> setter) {
+        super(parser, option, new WarningGuardSetter(setter, CheckLevel.OFF));
+      }
+    }
+
+    private static class WarningGuardSetter implements Setter<String> {
+      private final Setter<? super String> proxy;
+      private final CheckLevel level;
+
+      private WarningGuardSetter(
+          Setter<? super String> proxy, CheckLevel level) {
+        this.proxy = proxy;
+        this.level = level;
+      }
+
+      @Override public boolean isMultiValued() {
+        return proxy.isMultiValued();
+      }
+
+      @Override public Class<String> getType() {
+        return (Class<String>) proxy.getType();
+      }
+
+      @Override public void addValue(String value) throws CmdLineException {
+        proxy.addValue(value);
+        guardLevels.add(new GuardLevel(value, level));
+      }
+
+      @Override public FieldSetter asFieldSetter() {
+        return proxy.asFieldSetter();
+      }
+
+      @Override public AnnotatedElement asAnnotatedElement() {
+        return proxy.asAnnotatedElement();
+      }
+    }
+
+    public static WarningGuardSpec getWarningGuardSpec() {
+      WarningGuardSpec spec = new WarningGuardSpec();
+      for (GuardLevel guardLevel : guardLevels) {
+        spec.add(guardLevel.level, guardLevel.name);
+      }
+      return spec;
+    }
+  }
+
   // I don't really care about unchecked warnings in this class.
   @SuppressWarnings("unchecked")
-  private static class Flags {
-    private static List<GuardLevel> guardLevels = Lists.newArrayList();
-
+  private static class Flags extends AbstractFlags {
     @Option(name = "--help",
         handler = BooleanOptionHandler.class,
         usage = "Displays this message")
@@ -475,122 +597,6 @@ public class CommandLineRunner extends
       allJsInputs.addAll(arguments);
       return allJsInputs;
     }
-
-    // Our own option parser to be backwards-compatible.
-    // It needs to be public because of the crazy reflection that args4j does.
-    public static class BooleanOptionHandler extends OptionHandler<Boolean> {
-      private static final Set<String> TRUES =
-          Sets.newHashSet("true", "on", "yes", "1");
-      private static final Set<String> FALSES =
-          Sets.newHashSet("false", "off", "no", "0");
-
-      public BooleanOptionHandler(
-          CmdLineParser parser, OptionDef option,
-          Setter<? super Boolean> setter) {
-        super(parser, option, setter);
-      }
-
-      @Override
-      public int parseArguments(Parameters params) throws CmdLineException {
-        String param = null;
-        try {
-          param = params.getParameter(0);
-        } catch (CmdLineException e) {
-          param = null; // to stop linter complaints
-        }
-
-        if (param == null) {
-          setter.addValue(true);
-          return 0;
-        } else {
-          String lowerParam = param.toLowerCase();
-          if (TRUES.contains(lowerParam)) {
-            setter.addValue(true);
-          } else if (FALSES.contains(lowerParam)) {
-            setter.addValue(false);
-          } else {
-            setter.addValue(true);
-            return 0;
-          }
-          return 1;
-        }
-      }
-
-      @Override
-      public String getDefaultMetaVariable() {
-        return null;
-      }
-    }
-
-    // Our own parser for warning guards that preserves the original order
-    // of the flags.
-    public static class WarningGuardErrorOptionHandler
-        extends StringOptionHandler {
-      public WarningGuardErrorOptionHandler(
-          CmdLineParser parser, OptionDef option,
-          Setter<? super String> setter) {
-        super(parser, option, new WarningGuardSetter(setter, CheckLevel.ERROR));
-      }
-    }
-
-    public static class WarningGuardWarningOptionHandler
-        extends StringOptionHandler {
-      public WarningGuardWarningOptionHandler(
-          CmdLineParser parser, OptionDef option,
-          Setter<? super String> setter) {
-        super(parser, option,
-            new WarningGuardSetter(setter, CheckLevel.WARNING));
-      }
-    }
-
-    public static class WarningGuardOffOptionHandler
-        extends StringOptionHandler {
-      public WarningGuardOffOptionHandler(
-          CmdLineParser parser, OptionDef option,
-          Setter<? super String> setter) {
-        super(parser, option, new WarningGuardSetter(setter, CheckLevel.OFF));
-      }
-    }
-
-    private static class WarningGuardSetter implements Setter<String> {
-      private final Setter<? super String> proxy;
-      private final CheckLevel level;
-
-      private WarningGuardSetter(
-          Setter<? super String> proxy, CheckLevel level) {
-        this.proxy = proxy;
-        this.level = level;
-      }
-
-      @Override public boolean isMultiValued() {
-        return proxy.isMultiValued();
-      }
-
-      @Override public Class<String> getType() {
-        return (Class<String>) proxy.getType();
-      }
-
-      @Override public void addValue(String value) throws CmdLineException {
-        proxy.addValue(value);
-        guardLevels.add(new GuardLevel(value, level));
-      }
-
-      @Override public FieldSetter asFieldSetter() {
-        return proxy.asFieldSetter();
-      }
-
-      @Override public AnnotatedElement asAnnotatedElement() {
-        return proxy.asAnnotatedElement();
-      }
-    }
-
-    public static WarningGuardSpec getWarningGuardSpec() {
-      WarningGuardSpec spec = new WarningGuardSpec();
-      for (GuardLevel guardLevel : guardLevels) {
-        spec.add(guardLevel.level, guardLevel.name);
-      }
-      return spec;
-    }
   }
 
   /**
@@ -662,7 +668,7 @@ public class CommandLineRunner extends
     return tokens;
   }
 
-  private List<String> processArgs(String[] args) {
+  static List<String> processArgs(String[] args) {
     // Args4j has a different format that the old command-line parser.
     // So we use some voodoo to get the args into the format that args4j
     // expects.
@@ -892,7 +898,7 @@ public class CommandLineRunner extends
     }
   }
 
-  // The externs expected in externs.zip, in sorted order.
+  // The default externs to use in externs.zip, in sorted order.
   private static final List<String> DEFAULT_EXTERNS_NAMES = ImmutableList.of(
     // JS externs
     "es3.js",
@@ -948,35 +954,65 @@ public class CommandLineRunner extends
     "webkit_notifications.js",
     "webgl.js");
 
-  /**
-   * @return a mutable list
-   * @throws IOException
-   */
-  public static List<SourceFile> getDefaultExterns() throws IOException {
+  // The expected in externs.zip
+  private static final Set<String> EXPECTED_EXTERNS_NAMES =
+      ImmutableSet.<String>builder()
+      .addAll(DEFAULT_EXTERNS_NAMES)
+      .add("nodejs.js")
+      .build();
+
+  final static String EMBEDDED_EXTERNS_PREFIX = "externs.zip//";
+
+  static InputStream getExternsInputStream(String name) {
     InputStream input = CommandLineRunner.class.getResourceAsStream(
-        "/externs.zip");
+        "/" + name);
     if (input == null) {
       // In some environments, the externs.zip is relative to this class.
-      input = CommandLineRunner.class.getResourceAsStream("externs.zip");
+      input = CommandLineRunner.class.getResourceAsStream(name);
     }
-    Preconditions.checkNotNull(input);
+    return input;
+  }
 
+  /**
+   * @return A map of externs name to source file in the zip file.
+   */
+  public static Map<String, SourceFile> getEmbeddedExternsMap()
+      throws IOException {
+    Map<String, SourceFile> externsMap = getExternsMap(
+        getExternsInputStream("externs.zip"), EMBEDDED_EXTERNS_PREFIX);
+    Preconditions.checkState(
+        externsMap.keySet().equals(EXPECTED_EXTERNS_NAMES),
+        "Externs zip must match our hard-coded list of externs",
+        externsMap.keySet());
+    return externsMap;
+  }
+
+  /**
+   * @param prefix Give the files an odd prefix, so that they do not conflict
+   *     with the user's files.
+   * @return A map of externs name to source file in the zip file.
+   */
+  static Map<String, SourceFile> getExternsMap(InputStream input, String prefix)
+      throws IOException {
+    Preconditions.checkNotNull(input);
     ZipInputStream zip = new ZipInputStream(input);
     Map<String, SourceFile> externsMap = Maps.newHashMap();
     for (ZipEntry entry = null; (entry = zip.getNextEntry()) != null; ) {
+      if (entry.isDirectory()) continue;
+
       BufferedInputStream entryStream = new BufferedInputStream(
           ByteStreams.limit(zip, entry.getSize()));
       externsMap.put(entry.getName(),
           SourceFile.fromInputStream(
-              // Give the files an odd prefix, so that they do not conflict
-              // with the user's files.
-              "externs.zip//" + entry.getName(),
+              prefix + entry.getName(),
               entryStream));
     }
+    return externsMap;
+  }
 
-    Preconditions.checkState(
-        externsMap.keySet().equals(Sets.newHashSet(DEFAULT_EXTERNS_NAMES)),
-        "Externs zip must match our hard-coded list of externs.");
+  /** Gets all the externs in the zip. */
+  public static List<SourceFile> getDefaultExterns() throws IOException {
+    Map<String, SourceFile> externsMap = getEmbeddedExternsMap();
 
     // Order matters, so the resources must be added to the result list
     // in the expected order.

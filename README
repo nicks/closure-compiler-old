@@ -312,3 +312,17 @@ Description:
   maven repositories.
 
 Local Modifications: None
+
+
+---
+Code in:
+contrib/nodejs
+URL: https://github.com/dcodeIO/node.js-closure-compiler-externs
+Version: e891b4fbcf5f466cc4307b0fa842a7d8163a073a
+License: Apache License 2.0
+Description:
+  Type contracts for NodeJS APIs
+
+Local Modifications: 
+  Substantial changes to make them compatible
+  with NpmCommandLineRunner. 
