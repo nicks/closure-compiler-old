@@ -2457,6 +2457,10 @@ public class Node implements Cloneable, Serializable {
     return this.getType() == Token.MEMBER_DEF;
   }
 
+  public boolean isModuleColon() {
+    return this.getType() == Token.COLONCOLON;
+  }
+
   public boolean isName() {
     return this.getType() == Token.NAME;
   }

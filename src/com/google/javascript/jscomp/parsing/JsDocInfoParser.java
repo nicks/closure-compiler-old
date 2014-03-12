@@ -2014,12 +2014,18 @@ public final class JsDocInfoParser {
       next();
       skipEOLs();
 
-      typeName = newNode(Token.COLONCOLON);
+      // It's shitty that this is a string node, but it's needed downstream
+      // so that we can transform this into a normal STRING.
+      typeName = Node.newString(
+          Token.COLONCOLON, "", stream.getLineno(), stream.getCharno())
+          .clonePropsFrom(templateNode);
       typeName.addChildToBack(firstName);
 
       if (match(JsDocToken.STRING)) {
         localTypeName = readTypeExpr();
         typeName.addChildToBack(localTypeName);
+        next();
+        skipEOLs();
       } else {
         return typeName;
       }

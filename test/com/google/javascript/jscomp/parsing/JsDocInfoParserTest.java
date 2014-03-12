@@ -139,8 +139,13 @@ public class JsDocInfoParserTest extends BaseJSTypeTestCase {
           "Bad type annotation. expected closing }");
     parse("@type {'x:y'::z} */",
           "Bad type annotation. expected closing }");
-    parse("@type {\"x.y\"::z} */",
+    parse("@type {\"x:y\"::z} */",
           "Bad type annotation. expected closing }");
+  }
+
+  public void testParseModuleReference6() throws Exception {
+    parse("@type {bar::x} */");
+    parse("@type {bar::} */");
   }
 
   public void testParseNamedType1() throws Exception {

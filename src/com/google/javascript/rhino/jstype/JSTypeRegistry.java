@@ -1632,6 +1632,14 @@ public class JSTypeRegistry implements Serializable {
       case Token.VOID: // Only allowed in the return value of a function.
         return getNativeType(VOID_TYPE);
 
+      case Token.COLONCOLON:
+        // module names are supposed to be flattened before type resolution.
+        reporter.warning(
+            SimpleErrorReporter.getMessage0(
+                "msg.jsdoc.moduleName.forbidden"),
+            sourceName, n.getLineno(), n.getCharno());
+        return getNativeType(UNKNOWN_TYPE);
+
       case Token.STRING:
         JSType namedType = getType(scope, n.getString(), sourceName,
             n.getLineno(), n.getCharno());

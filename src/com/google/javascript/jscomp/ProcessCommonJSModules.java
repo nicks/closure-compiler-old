@@ -23,6 +23,7 @@ import com.google.javascript.jscomp.Scope.Var;
 import com.google.javascript.rhino.IR;
 import com.google.javascript.rhino.JSDocInfo;
 import com.google.javascript.rhino.Node;
+import com.google.javascript.rhino.Token;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -403,6 +404,26 @@ public class ProcessCommonJSModules implements CompilerPass {
      * Replace type name references.
      */
     private void fixTypeNode(NodeTraversal t, Node typeNode) {
+      // Transform Foo::bar into the equivalent of require('Foo').bar
+      if (typeNode.isModuleColon()) {
+        Node moduleName = typeNode.getFirstChild();
+        String loadAddress =
+            loader.locate(moduleName.getString(), t.getInput());
+        if (loadAddress == null) {
+          t.makeError(moduleName, LOAD_ERROR, moduleName.getString());
+          return;
+        }
+        String globalModuleName = toModuleName(loadAddress);
+        Node localTypeName = moduleName.getNext();
+
+        typeNode.removeChildren();
+        typeNode.setType(Token.STRING);
+        typeNode.setString(localTypeName == null ?
+            globalModuleName :
+            globalModuleName + "." + localTypeName.getString());
+        return;
+      }
+
       if (typeNode.isString()) {
         String name = typeNode.getString();
         int endIndex = name.indexOf('.');

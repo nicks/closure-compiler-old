@@ -12932,6 +12932,11 @@ public class TypeCheckTest extends CompilerTypeTestCase {
         "required: null", false);
   }
 
+  public void testModuleReferenceNotAllowed() throws Exception {
+    testTypes(
+        "/** @param {Foo::bar} z */ function f(z) {}",
+        "Parse error. module qualifier not allowed here");
+  }
 
   private void testTypes(String js) throws Exception {
     testTypes(js, (String) null);
