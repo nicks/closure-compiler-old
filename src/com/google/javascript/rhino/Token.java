@@ -190,8 +190,7 @@ public class Token {
         EQUALS         = 307,
         LB             = 308,  // left brackets
         LC             = 309,  // left curly braces
-        COLON          = 310,
-        COLONCOLON     = 311;
+        COLON          = 310;
 
   public static String name(int token) {
         switch (token) {
@@ -296,7 +295,6 @@ public class Token {
           case LB:              return "LB";
           case LC:              return "LC";
           case COLON:           return "COLON";
-          case COLONCOLON:      return "COLONCOLON";
 
           case ARRAY_PATTERN:   return "ARRAY_PATTERN";
           case OBJECT_PATTERN:  return "OBJECT_PATTERN";
@@ -424,7 +422,6 @@ public class Token {
       case LB:              return -1;
       case LC:              return -1;
       case COLON:           return -1;
-      case COLONCOLON:      return -1;
     }
     throw new IllegalStateException(String.valueOf(token));
   }
