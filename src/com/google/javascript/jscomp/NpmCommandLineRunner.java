@@ -189,7 +189,7 @@ public class NpmCommandLineRunner extends
         entryJsFiles.add(getMainJsFile(i));
       }
     } catch (Exception e) {
-      err.println(e.getMessage());
+      e.printStackTrace(err);
       isConfigValid = false;
       return;
     }
@@ -334,14 +334,58 @@ public class NpmCommandLineRunner extends
     String main = null;
     try {
       main = packageJson.getString("main");
-    } catch (JSONException e) {
-      throw new IllegalArgumentException(
-          "package.json must contain a 'main' property for the " +
-          "main JS file");
+    } catch (JSONException e) {} // Fall through to the default main file.
+
+    File mainFile = tryMainFile(argFile, main);
+    if (mainFile == null) {
+      throw new IOException("Could not find main JS entry point at " + argFile);
     }
 
-    return FileSystems.getDefault().getPath(argPath, main)
+    return FileSystems.getDefault().getPath(mainFile.toString())
         .normalize().toString();
+  }
+
+  /**
+   * Simulates the 'main' search algorithm in nodejs
+   */
+  static File tryMainFile(File dir, String customName) {
+    File candidate = null;
+
+    if (customName != null) {
+      candidate = new File(dir, customName);
+      if (candidate.exists()) return candidate;
+
+      candidate = new File(dir, customName + ".js");
+      if (candidate.exists()) return candidate;
+    }
+
+    candidate = new File(dir, "index");
+    if (candidate.exists()) return candidate;
+
+    candidate = new File(dir, "index.js");
+    if (candidate.exists()) return candidate;
+
+    return null;
+  }
+
+  /**
+   * Simulates the normal js search algorithm in nodejs
+   */
+  static File tryFile(File dir, String customName) {
+    // Do not try to load other types of requires, like json files.
+    if (customName.endsWith(".json")) {
+      return new File(dir, customName + ".js");
+    }
+
+    File candidate = new File(dir, customName);
+    if (candidate.exists()) {
+      if (candidate.isDirectory()) {
+        return tryMainFile(candidate, null);
+      }
+      return candidate;
+    }
+
+    return new File(dir, customName + ".js");
   }
 
   /**
@@ -403,7 +447,7 @@ public class NpmCommandLineRunner extends
       File currentDir = new File(referrer.getName())
           .getParentFile();
       if (ES6ModuleLoader.isRelativeIdentifier(name)) {
-        return getCanonicalPath(new File(currentDir, name + ".js"));
+        return getCanonicalPath(tryFile(currentDir, name));
       }
 
       while (currentDir != null) {
@@ -440,13 +484,15 @@ public class NpmCommandLineRunner extends
         if (moduleFolder.isDirectory()) {
           packageFile = new File(moduleFolder, "package.json");
           if (packageFile.isFile()) {
+            String main = null;
             try {
               JSONObject packageJson = getPackageJson(packageFile);
-              String main = packageJson.getString("main");
-              return new File(moduleFolder, main);
+              main = packageJson.getString("main");
             }
             catch (JSONException e) {} // no one cares
             catch (IOException e) {} // no one cares
+
+            return tryMainFile(moduleFolder, main);
           }
         }
       }

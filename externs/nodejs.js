@@ -21,6 +21,18 @@
  * @author nicholas.j.santos@gmail.com (Nick Santos)
  */
 
+/** @const {string} */
+var __filename;
+
+/** @const {string} */
+var __dirname;
+
+/**
+ * @param {string} name
+ * @return {?}
+ */
+function require(name) {}
+
 // http://nodejs.org/api/timers.html
 
 /**
