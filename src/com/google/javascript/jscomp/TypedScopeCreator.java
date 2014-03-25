@@ -993,7 +993,10 @@ final class TypedScopeCreator implements ScopeCreator {
       FunctionType result = null;
 
       // First, check to see if the property is implemented
-      // on a superclass.
+      // on a superclass. We need to resolve the type first in order
+      // for this to work.
+      ownerType.resolve(typeParsingErrorReporter, scope);
+
       JSType propType = ownerType.getPropertyType(propName);
       if (propType != null && propType.isFunctionType()) {
         result =  propType.toMaybeFunctionType();
