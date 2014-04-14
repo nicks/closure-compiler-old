@@ -48,71 +48,6 @@ stream.Stream.prototype.pipe;
 
 /**
  * @constructor
- * @extends stream.Readable
- */
-stream.ReadableStream = function() {};
-
-/**
- * @type {boolean}
- */
-stream.ReadableStream.prototype.readable;
-
-/**
- * @param {string=} encoding
- * @return {void}
- */
-stream.ReadableStream.prototype.setEncoding;
-
-/**
- * @return {void}
- */
-stream.ReadableStream.prototype.destroy;
-
-/**
- * @constructor
- * @extends stream.Writable
- */
-stream.WritableStream = function() {};
-
-/**
- * @return {void}
- */
-stream.WritableStream.prototype.drain;
-
-/**
- * @type {boolean}
- */
-stream.WritableStream.prototype.writable;
-
-/**
- * @param {string|Buffer} buffer
- * @param {string=} encoding
- * @return {void}
- */
-stream.WritableStream.prototype.write;
-
-/**
- * @param {string|Buffer=} buffer
- * @param {string=} encoding
- * @param {function(*=)=} cb
- * @return {void}
- */
-stream.WritableStream.prototype.end;
-
-/**
- * @return {void}
- */
-stream.WritableStream.prototype.destroy;
-
-/**
- * @return {void}
- */
-stream.WritableStream.prototype.destroySoon;
-
-// Undocumented
-
-/**
- * @constructor
  * @param {Object=} options
  * @extends stream.Stream
  */
@@ -180,6 +115,28 @@ stream.Readable.prototype.wrap;
 
 /**
  * @constructor
+ * @extends stream.Readable
+ */
+stream.ReadableStream = function() {};
+
+/**
+ * @type {boolean}
+ */
+stream.ReadableStream.prototype.readable;
+
+/**
+ * @param {string=} encoding
+ * @return {void}
+ */
+stream.ReadableStream.prototype.setEncoding;
+
+/**
+ * @return {void}
+ */
+stream.ReadableStream.prototype.destroy;
+
+/**
+ * @constructor
  * @param {Object=} options
  * @extends stream.Stream
  */
@@ -215,6 +172,47 @@ stream.Writable.prototype._write;
  * @return {void}
  */
 stream.Writable.prototype.end;
+
+/**
+ * @constructor
+ * @extends stream.Writable
+ */
+stream.WritableStream = function() {};
+
+/**
+ * @return {void}
+ */
+stream.WritableStream.prototype.drain;
+
+/**
+ * @type {boolean}
+ */
+stream.WritableStream.prototype.writable;
+
+/**
+ * @param {string|Buffer} buffer
+ * @param {string=} encoding
+ * @return {void}
+ */
+stream.WritableStream.prototype.write;
+
+/**
+ * @param {string|Buffer=} buffer
+ * @param {string=} encoding
+ * @param {function(*=)=} cb
+ * @return {void}
+ */
+stream.WritableStream.prototype.end;
+
+/**
+ * @return {void}
+ */
+stream.WritableStream.prototype.destroy;
+
+/**
+ * @return {void}
+ */
+stream.WritableStream.prototype.destroySoon;
 
 /**
  * @constructor
