@@ -283,6 +283,7 @@ public class NpmCommandLineRunner extends
     return Lists.newArrayList(
         externsMap.get("es3.js"),
         externsMap.get("es5.js"),
+        externsMap.get("es6.js"),
         externsMap.get("v8.js"),
         externsMap.get("nodejs.js"));
   }
