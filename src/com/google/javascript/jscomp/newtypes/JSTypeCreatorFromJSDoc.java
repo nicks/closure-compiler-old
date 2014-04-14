@@ -194,9 +194,12 @@ public class JSTypeCreatorFromJSDoc {
       case "string":
         return JSType.STRING;
       case "undefined":
+      case "void":
         return JSType.UNDEFINED;
       case "Function":
         return JSType.qmarkFunction();
+      case "Object":
+        return JSType.join(JSType.TOP_OBJECT, JSType.NULL);
       default: {
         if (hasTypeVariable(outerTypeParameters, ownerType, typeName)) {
           return JSType.fromTypeVar(typeName);
@@ -227,7 +230,7 @@ public class JSTypeCreatorFromJSDoc {
     }
     if (!n.hasChildren()) {
       ImmutableList.Builder<JSType> typeList = ImmutableList.builder();
-      for (String unused: rawType.getTypeParameters()) {
+      for (String unused : rawType.getTypeParameters()) {
         typeList.add(JSType.UNKNOWN);
       }
       return JSType.fromObjectType(ObjectType.fromNominalType(
@@ -345,7 +348,7 @@ public class JSTypeCreatorFromJSDoc {
       JSDocInfo jsdoc, RawNominalType ownerType, DeclaredTypeRegistry registry,
       ImmutableList<String> typeParameters, boolean implementedIntfs) {
     ImmutableSet.Builder<NominalType> builder = ImmutableSet.builder();
-    for (JSTypeExpression texp: (implementedIntfs ?
+    for (JSTypeExpression texp : (implementedIntfs ?
           jsdoc.getImplementedInterfaces() :
           jsdoc.getExtendedInterfaces())) {
       Node expRoot = texp.getRootNode();
@@ -433,7 +436,7 @@ public class JSTypeCreatorFromJSDoc {
               "declared in the JSDoc", funNode);
           warnedForMissingTypes = true;
         }
-        builder.addOptFormal(null);
+        builder.addOptFormal(JSType.UNKNOWN);
       } else {
         if (!warnedForInlineJsdoc && param.getJSDocInfo() != null) {
           warn("The function cannot have both an @type jsdoc and inline " +
@@ -450,7 +453,7 @@ public class JSTypeCreatorFromJSDoc {
               warn("The function has more formal parameters than the types " +
                   "declared in the JSDoc", funNode);
               warnedForMissingTypes = true;
-              builder.addOptFormal(null);
+              builder.addOptFormal(JSType.UNKNOWN);
             }
             break;
           default:
@@ -495,7 +498,7 @@ public class JSTypeCreatorFromJSDoc {
     Node params = funNode.getFirstChild().getNext();
     ImmutableList<String> typeParameters = null;
 
-    // TODO(user): need more @template warnings
+    // TODO(dimvar): need more @template warnings
     // - warn for multiple @template annotations
     // - warn for @template annotation w/out usage
 
@@ -508,7 +511,7 @@ public class JSTypeCreatorFromJSDoc {
     for (Node param = params.getFirstChild();
          param != null;
          param = param.getNext()) {
-      String pname = param.getQualifiedName();
+      String pname = param.getString();
       JSType inlineParamType = ignoreJsdoc ? null :
           getNodeTypeDeclaration(param.getJSDocInfo(), ownerType, registry);
       boolean isRequired = true, isRestFormals = false;
@@ -529,7 +532,7 @@ public class JSTypeCreatorFromJSDoc {
             getTypeFromNode(jsdocNode, ownerType, registry, typeParameters);
       }
       if (inlineParamType != null) {
-        // TODO(user): The support for inline optional parameters is currently
+        // TODO(dimvar): The support for inline optional parameters is currently
         // broken, so this is always a required parameter. See b/11481388. Fix.
         builder.addReqFormal(inlineParamType);
         if (fnParamType != null) {
@@ -559,6 +562,17 @@ public class JSTypeCreatorFromJSDoc {
     }
 
     return builder;
+  }
+
+  // /** @param {...?} var_args */ function f(var_args) { ... }
+  // var_args shouldn't be used in the body of f
+  public boolean isRestArg(JSDocInfo funJsdoc, String formalParamName) {
+    if (funJsdoc == null) {
+      return false;
+    }
+    JSTypeExpression texp = funJsdoc.getParameterType(formalParamName);
+    Node jsdocNode = texp == null ? null : texp.getRootNode();
+    return jsdocNode != null && jsdocNode.getType() == Token.ELLIPSIS;
   }
 
   void warn(String msg, Node faultyNode) {

@@ -30,6 +30,7 @@ import com.google.javascript.jscomp.CompilerOptions.LanguageMode;
 import com.google.javascript.jscomp.CoverageInstrumentationPass.CoverageReach;
 import com.google.javascript.jscomp.ExtractPrototypeMemberDeclarations.Pattern;
 import com.google.javascript.jscomp.NodeTraversal.Callback;
+import com.google.javascript.jscomp.lint.CheckNullableReturn;
 import com.google.javascript.jscomp.parsing.ParserRunner;
 import com.google.javascript.rhino.IR;
 import com.google.javascript.rhino.Node;
@@ -316,7 +317,7 @@ public class DefaultPassConfig extends PassConfig {
       }
     }
 
-    if (options.checkUnreachableCode.isOn() ||
+    if (!options.disables(DiagnosticGroups.CHECK_USELESS_CODE) ||
         (options.checkTypes && options.checkMissingReturn.isOn())) {
       checks.add(checkControlFlow);
     }
@@ -326,6 +327,11 @@ public class DefaultPassConfig extends PassConfig {
         (!options.disables(DiagnosticGroups.ACCESS_CONTROLS)
          || options.enables(DiagnosticGroups.CONSTANT_PROPERTY))) {
       checks.add(checkAccessControls);
+    }
+
+    // Lint checks must be run after typechecking.
+    if (options.enables(DiagnosticGroups.LINT_CHECKS)) {
+      checks.add(lintChecks);
     }
 
     if (options.checkEventfulObjectDisposalPolicy !=
@@ -446,6 +452,17 @@ public class DefaultPassConfig extends PassConfig {
     // unused methods that share the same name as methods called from unused
     // code.
     if (options.extraSmartNameRemoval && options.smartNameRemoval) {
+
+      // These passes remove code that is dead because of define flags.
+      // If the dead code is weakly typed, running these passes before property
+      // disambiguation results in more code removal.
+      // The passes are one-time on purpose. (The later runs are loopable.)
+      if (options.foldConstants &&
+          (options.inlineVariables || options.inlineLocalVariables)) {
+        passes.add(earlyInlineVariables);
+        passes.add(earlyPeepholeOptimizations);
+      }
+
       passes.add(smartNamePass);
     }
 
@@ -1131,6 +1148,31 @@ public class DefaultPassConfig extends PassConfig {
     }
   };
 
+  final PassFactory earlyPeepholeOptimizations =
+      new PassFactory("earlyPeepholeOptimizations", true) {
+    @Override
+    protected CompilerPass create(AbstractCompiler compiler) {
+      return new PeepholeOptimizationsPass(compiler,
+          new PeepholeRemoveDeadCode());
+    }
+  };
+
+  final PassFactory earlyInlineVariables =
+      new PassFactory("earlyInlineVariables", true) {
+    @Override
+    protected CompilerPass create(AbstractCompiler compiler) {
+      InlineVariables.Mode mode;
+      if (options.inlineVariables) {
+        mode = InlineVariables.Mode.ALL;
+      } else if (options.inlineLocalVariables) {
+        mode = InlineVariables.Mode.LOCALS_ONLY;
+      } else {
+        throw new IllegalStateException("No variable inlining option set.");
+      }
+      return new InlineVariables(compiler, mode, true);
+    }
+  };
+
   /** Various peephole optimizations. */
   final PassFactory peepholeOptimizations =
       new PassFactory("peepholeOptimizations", false) {
@@ -1325,9 +1367,8 @@ public class DefaultPassConfig extends PassConfig {
     @Override
     protected HotSwapCompilerPass create(AbstractCompiler compiler) {
       List<Callback> callbacks = Lists.newArrayList();
-      if (options.checkUnreachableCode.isOn()) {
-        callbacks.add(
-            new CheckUnreachableCode(compiler, options.checkUnreachableCode));
+      if (!options.disables(DiagnosticGroups.CHECK_USELESS_CODE)) {
+        callbacks.add(new CheckUnreachableCode(compiler));
       }
       if (options.checkMissingReturn.isOn() && options.checkTypes) {
         callbacks.add(
@@ -1343,6 +1384,14 @@ public class DefaultPassConfig extends PassConfig {
     @Override
     protected HotSwapCompilerPass create(AbstractCompiler compiler) {
       return new CheckAccessControls(compiler);
+    }
+  };
+
+  final PassFactory lintChecks =
+      new PassFactory("lintChecks", true) {
+    @Override
+    protected CompilerPass create(AbstractCompiler compiler) {
+      return new CheckNullableReturn(compiler);
     }
   };
 

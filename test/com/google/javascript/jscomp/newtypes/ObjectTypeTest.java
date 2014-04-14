@@ -31,12 +31,15 @@ import junit.framework.TestCase;
  * @author dimvar@google.com (Dimitris Vardoulakis)
  */
 public class ObjectTypeTest extends TestCase {
+  static final QualifiedName p = new QualifiedName("p");
+  static final QualifiedName q = new QualifiedName("q");
+
   public void testObjectSubtyping() {
     ObjectType topObj = ObjectType.TOP_OBJECT;
-    ObjectType withPNum = topObj.withProperty("p", NUMBER);
-    ObjectType withPStr = topObj.withProperty("p", STRING);
+    ObjectType withPNum = topObj.withProperty(p, NUMBER);
+    ObjectType withPStr = topObj.withProperty(p, STRING);
     ObjectType withOptionalProps = ObjectType.join(
-        withPNum, topObj.withProperty("q", STRING));
+        withPNum, topObj.withProperty(q, STRING));
     ObjectType withOneOptional = ObjectType.join(withPNum, topObj);
 
     assertTrue(withPNum.isSubtypeOf(topObj));
@@ -49,24 +52,29 @@ public class ObjectTypeTest extends TestCase {
 
   public void testClassSubtyping() {
     ObjectType foo = ObjectType.fromNominalType(NominalType.fromRaw(
-        RawNominalType.makeClass("Foo", null).finalizeNominalType()));
+        RawNominalType.makeUnrestrictedClass("Foo", null)
+        .finalizeNominalType()));
     ObjectType bar = ObjectType.fromNominalType(NominalType.fromRaw(
-        RawNominalType.makeClass("Bar", null).finalizeNominalType()));
+        RawNominalType.makeUnrestrictedClass("Bar", null)
+        .finalizeNominalType()));
     assertTrue(foo.isSubtypeOf(foo));
     assertFalse(foo.isSubtypeOf(bar));
   }
 
   public void testObjectUnions() {
     ObjectType foo = ObjectType.fromNominalType(NominalType.fromRaw(
-        RawNominalType.makeClass("Foo", null).finalizeNominalType()));
+        RawNominalType.makeUnrestrictedClass("Foo", null)
+        .finalizeNominalType()));
     ObjectType bar = ObjectType.fromNominalType(NominalType.fromRaw(
-        RawNominalType.makeClass("Bar", null).finalizeNominalType()));
+        RawNominalType.makeUnrestrictedClass("Bar", null)
+        .finalizeNominalType()));
     ObjectType baz = ObjectType.fromNominalType(NominalType.fromRaw(
-        RawNominalType.makeClass("Baz", null).finalizeNominalType()));
+        RawNominalType.makeUnrestrictedClass("Baz", null)
+        .finalizeNominalType()));
     ObjectType topObj = ObjectType.TOP_OBJECT;
-    ObjectType withPNum = topObj.withProperty("p", NUMBER);
-    ObjectType fooWithPNum = foo.withProperty("p", NUMBER);
-    ObjectType fooWithQStr = foo.withProperty("q", STRING);
+    ObjectType withPNum = topObj.withProperty(p, NUMBER);
+    ObjectType fooWithPNum = foo.withProperty(p, NUMBER);
+    ObjectType fooWithQStr = foo.withProperty(q, STRING);
     // joins
     assertEquals(topObj, ObjectType.join(foo, topObj));
     assertEquals(ImmutableSet.of(topObj),
@@ -94,21 +102,23 @@ public class ObjectTypeTest extends TestCase {
 
   public void testSimpleClassInheritance() {
     NominalType parentClass = NominalType.fromRaw(
-        RawNominalType.makeClass("Parent", null).finalizeNominalType());
+        RawNominalType.makeUnrestrictedClass("Parent", null)
+        .finalizeNominalType());
     NominalType child1Class = NominalType.fromRaw(
-        RawNominalType.makeClass("Child1", null));
+        RawNominalType.makeUnrestrictedClass("Child1", null));
     child1Class.getRawNominalType().addSuperClass(parentClass);
     child1Class.getRawNominalType().finalizeNominalType();
     NominalType child2Class = NominalType.fromRaw(
-        RawNominalType.makeClass("Child2", null));
+        RawNominalType.makeUnrestrictedClass("Child2", null));
     child2Class.getRawNominalType().addSuperClass(parentClass);
     child2Class.getRawNominalType().finalizeNominalType();
     ObjectType foo = ObjectType.fromNominalType(NominalType.fromRaw(
-        RawNominalType.makeClass("Foo", null).finalizeNominalType()));
+        RawNominalType.makeUnrestrictedClass("Foo", null)
+        .finalizeNominalType()));
     ObjectType parent = ObjectType.fromNominalType(parentClass);
     ObjectType child1 = ObjectType.fromNominalType(child1Class);
     ObjectType child2 = ObjectType.fromNominalType(child2Class);
-    ObjectType parentWithP = parent.withProperty("p", NUMBER);
+    ObjectType parentWithP = parent.withProperty(p, NUMBER);
     ObjectType parentWithOptP = ObjectType.join(parent, parentWithP);
 
     assertEquals(ImmutableSet.of(parentWithOptP),
@@ -116,13 +126,13 @@ public class ObjectTypeTest extends TestCase {
               ImmutableSet.of(parentWithP), ImmutableSet.of(child1)));
 
     assertTrue(ObjectType.isUnionSubtype(
-        ImmutableSet.of(foo, child1), ImmutableSet.of(foo, parent)));
+        true, ImmutableSet.of(foo, child1), ImmutableSet.of(foo, parent)));
     assertFalse(ObjectType.isUnionSubtype(
-        ImmutableSet.of(foo, parent), ImmutableSet.of(foo, child1)));
+        true, ImmutableSet.of(foo, parent), ImmutableSet.of(foo, child1)));
 
     assertTrue(ObjectType.isUnionSubtype(
-        ImmutableSet.of(child1, child2), ImmutableSet.of(parent)));
+        true, ImmutableSet.of(child1, child2), ImmutableSet.of(parent)));
     assertFalse(ObjectType.isUnionSubtype(
-        ImmutableSet.of(parent), ImmutableSet.of(child1, child2)));
+        true, ImmutableSet.of(parent), ImmutableSet.of(child1, child2)));
   }
 }

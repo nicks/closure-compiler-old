@@ -377,7 +377,7 @@ final class FunctionTypeBuilder {
       if (info.getImplementedInterfaceCount() > 0) {
         if (isConstructor) {
           implementedInterfaces = Lists.newArrayList();
-          Set<JSType> baseInterfaces = new HashSet<JSType>();
+          Set<JSType> baseInterfaces = new HashSet<>();
           for (JSTypeExpression t : info.getImplementedInterfaces()) {
             JSType maybeInterType = t.evaluate(scope, typeRegistry);
 
@@ -812,7 +812,7 @@ final class FunctionTypeBuilder {
    * care of most scope-declaring.
    */
   private Scope getScopeDeclaredIn() {
-    int dotIndex = fnName.indexOf(".");
+    int dotIndex = fnName.indexOf('.');
     if (dotIndex != -1) {
       String rootVarName = fnName.substring(0, dotIndex);
       Var rootVar = scope.getVar(rootVarName);

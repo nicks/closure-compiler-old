@@ -62,12 +62,18 @@ public class MinimizedConditionTest extends TestCase {
     Node negativeResult =
         result.getMinimized(MinimizationStyle.ALLOW_LEADING_NOT).getNode();
     if (!positiveResult.isEquivalentTo(positiveNode)) {
-      fail("Not equal:\n" + positiveResult.toStringTree()
-          + "and:\n" + positiveNode.toStringTree());
+      fail("Not equal:" +
+          "\nExpected: " + positive +
+          "\nBut was : " + (new Compiler()).toSource(positiveResult) +
+          "\nExpected tree:\n" + positiveNode.toStringTree() +
+          "\nActual tree:\n" + positiveResult.toStringTree());
     }
     if (!negativeResult.isEquivalentTo(negativeNode)) {
-      fail("Not equal:\n" + negativeResult.toStringTree()
-          + "and:\n" + negativeNode.toStringTree());
+      fail("Not equal:" +
+          "\nExpected: " + negative +
+          "\nBut was : " + (new Compiler()).toSource(negativeResult) +
+          "\nExpected tree:\n" + negativeNode.toStringTree() +
+          "\nActual tree:\n" + negativeResult.toStringTree());
     }
   }
 
@@ -91,7 +97,9 @@ public class MinimizedConditionTest extends TestCase {
   public void testMinimizeBug8494751() {
     minCond(
         "x && (y===2 || !f()) && (y===3 || !h())",
-        "x && !((y!==2 && f()) || (y!==3 && h()))",
+        // TODO(tbreisacher): The 'positive' option could be better:
+        // "x && !((y!==2 && f()) || (y!==3 && h()))",
+        "!(!x || (y!==2 && f()) || (y!==3 && h()))",
         "!(!x || (y!==2 && f()) || (y!==3 && h()))");
   }
 

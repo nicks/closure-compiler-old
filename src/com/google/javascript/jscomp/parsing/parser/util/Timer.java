@@ -36,7 +36,7 @@ public class Timer {
     logTime(this.name, getCurrentTime() - this.start);
   }
 
-  private long getCurrentTime() {
+  private static long getCurrentTime() {
     return System.currentTimeMillis();
   }
 
@@ -50,7 +50,7 @@ public class Timer {
     }
   }
 
-  private static final HashMap<String, Entry> entries = new HashMap<String, Entry>();
+  private static final HashMap<String, Entry> entries = new HashMap<>();
 
   public static void logTime(String name, long elapsedTime) {
     Entry entry = getEntry(name);

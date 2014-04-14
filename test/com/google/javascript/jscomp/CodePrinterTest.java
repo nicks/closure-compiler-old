@@ -29,11 +29,16 @@ import junit.framework.TestCase;
 import java.util.List;
 
 public class CodePrinterTest extends TestCase {
+  // If this is set, ignore parse warnings and only fail the test
+  // for parse errors.
+  private boolean allowWarnings = false;
+
   private boolean trustedStrings = true;
   private Compiler lastCompiler = null;
   private LanguageMode languageMode = LanguageMode.ECMASCRIPT5;
 
   @Override public void setUp() {
+    allowWarnings = false;
     trustedStrings = true;
     lastCompiler = null;
     languageMode = LanguageMode.ECMASCRIPT5;
@@ -70,16 +75,22 @@ public class CodePrinterTest extends TestCase {
     return n;
   }
 
-  private static void checkUnexpectedErrorsOrWarnings(
+  private void checkUnexpectedErrorsOrWarnings(
       Compiler compiler, int expected) {
-    int actual = compiler.getErrors().length + compiler.getWarnings().length;
+    int actual = compiler.getErrors().length;
+    if (!allowWarnings) {
+      actual += compiler.getWarnings().length;
+    }
+
     if (actual != expected) {
       String msg = "";
       for (JSError err : compiler.getErrors()) {
         msg += "Error:" + err.toString() + "\n";
       }
-      for (JSError err : compiler.getWarnings()) {
-        msg += "Warning:" + err.toString() + "\n";
+      if (!allowWarnings) {
+        for (JSError err : compiler.getWarnings()) {
+          msg += "Warning:" + err.toString() + "\n";
+        }
       }
       assertEquals("Unexpected warnings or errors.\n " + msg, expected, actual);
     }
@@ -601,7 +612,7 @@ public class CodePrinterTest extends TestCase {
   public void testPrettyPrinter() {
     // Ensure that the pretty printer inserts line breaks at appropriate
     // places.
-    assertPrettyPrint("(function(){})();","(function() {\n})();\n");
+    assertPrettyPrint("(function(){})();", "(function() {\n})();\n");
     assertPrettyPrint("var a = (function() {});alert(a);",
         "var a = function() {\n};\nalert(a);\n");
 
@@ -1434,11 +1445,11 @@ public class CodePrinterTest extends TestCase {
   }
 
   public void testArrayLiteral() {
-    assertPrint("var x = [,];","var x=[,]");
-    assertPrint("var x = [,,];","var x=[,,]");
-    assertPrint("var x = [,s,,];","var x=[,s,,]");
-    assertPrint("var x = [,s];","var x=[,s]");
-    assertPrint("var x = [s,];","var x=[s]");
+    assertPrint("var x = [,];", "var x=[,]");
+    assertPrint("var x = [,,];", "var x=[,,]");
+    assertPrint("var x = [,s,,];", "var x=[,s,,]");
+    assertPrint("var x = [,s];", "var x=[,s]");
+    assertPrint("var x = [s,];", "var x=[s]");
   }
 
   public void testZero() {
@@ -1455,6 +1466,9 @@ public class CodePrinterTest extends TestCase {
     // Octal 12 = Hex 0A = \n
     assertPrint("var x ='\\012';", "var x=\"\\n\"");
 
+    // Octal 13 = Hex 0B = \v, but we print it as \x0B. See issue 601.
+    assertPrint("var x ='\\013';", "var x=\"\\x0B\"");
+
     // Octal 34 = Hex 1C
     assertPrint("var x ='\\034';", "var x=\"\\u001c\"");
 
@@ -1466,28 +1480,49 @@ public class CodePrinterTest extends TestCase {
     assertPrint("var x ='\\01234';", "var x=\"\\n34\"");
   }
 
+  public void testOctalInStringNoLeadingZero() {
+    assertPrint("var x ='\\7';", "var x=\"\\u0007\"");
+
+    // Octal 12 = Hex 0A = \n
+    assertPrint("var x ='\\12';", "var x=\"\\n\"");
+
+    // Octal 13 = Hex 0B = \v, but we print it as \x0B. See issue 601.
+    assertPrint("var x ='\\13';", "var x=\"\\x0B\"");
+
+    // Octal 34 = Hex 1C
+    assertPrint("var x ='\\34';", "var x=\"\\u001c\"");
+
+    // 8 and 9 are not octal digits. '\' is ignored and the digit
+    // is just a regular character.
+    assertPrint("var x ='\\8';", "var x=\"8\"");
+    assertPrint("var x ='\\9';", "var x=\"9\"");
+
+    // Only the first two digits are part of the octal literal.
+    assertPrint("var x ='\\1234';", "var x=\"\\n34\"");
+  }
+
   public void testUnicode() {
     assertPrint("var x ='\\x0f';", "var x=\"\\u000f\"");
     assertPrint("var x ='\\x68';", "var x=\"h\"");
     assertPrint("var x ='\\x7f';", "var x=\"\\u007f\"");
   }
 
-  public void testUnicodeKeyword() {
-    // TODO(johnlenz): verify this is valid in the latest specs.
+  // Separate from testNumericKeys() so we can set allowWarnings.
+  public void testOctalNumericKey() {
+    allowWarnings = true;
+    languageMode = LanguageMode.ECMASCRIPT6;
 
-    // keyword "if"
-    assertPrint("var \\u0069\\u0066 = 1;", "var i\\u0066=1");
-    // keyword "var"
-    assertPrint("var v\\u0061\\u0072 = 1;", "var va\\u0072=1");
-    // all are keyword "while"
-    assertPrint("var w\\u0068\\u0069\\u006C\\u0065 = 1;"
-        + "\\u0077\\u0068il\\u0065 = 2;"
-        + "\\u0077h\\u0069le = 3;",
-        "var whil\\u0065=1;whil\\u0065=2;whil\\u0065=3");
+    assertPrint("var x = {010: 1};", "var x={8:1}");
+  }
+
+  public void testOctalNumericKeyStrict() {
+    allowWarnings = true;
+    languageMode = LanguageMode.ECMASCRIPT6_STRICT;
+
+    assertPrint("var x = {010: 1};", "var x={10:1}");
   }
 
   public void testNumericKeys() {
-    assertPrint("var x = {010: 1};", "var x={8:1}");
     assertPrint("var x = {'010': 1};", "var x={\"010\":1}");
 
     assertPrint("var x = {0x10: 1};", "var x={16:1}");

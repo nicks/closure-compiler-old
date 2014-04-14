@@ -100,17 +100,18 @@ public class JSTypeTest extends TestCase {
             ImmutableList.of(NUMBER, STRING), null, null, NUMBER));
     parseAndCompareTypes("function (number, string=):number",
         FunctionType.makeJSType(
-            ImmutableList.of(NUMBER), ImmutableList.of(STRING),
+            ImmutableList.of(NUMBER),
+            ImmutableList.of(JSType.join(STRING, UNDEFINED)),
             null, NUMBER));
     parseAndCompareTypes("function (string=): number",
-        FunctionType.makeJSType(
-            null, ImmutableList.of(STRING), null, NUMBER));
+        FunctionType.makeJSType(null,
+            ImmutableList.of(JSType.join(STRING, UNDEFINED)), null, NUMBER));
     parseAndCompareTypes("function (string=, ...[number]): number",
-        FunctionType.makeJSType(
-            null, ImmutableList.of(STRING), NUMBER, NUMBER));
+        FunctionType.makeJSType(null,
+            ImmutableList.of(JSType.join(STRING, UNDEFINED)), NUMBER, NUMBER));
     parseAndCompareTypes("function (string=, ...[string]): number",
-        FunctionType.makeJSType(
-            null, null, STRING, NUMBER));
+        FunctionType.makeJSType(null,
+            ImmutableList.of(JSType.join(STRING, UNDEFINED)), STRING, NUMBER));
   }
 
   public void testIsBoolean() {
@@ -136,7 +137,7 @@ public class JSTypeTest extends TestCase {
     assertEquals("bottom", BOTTOM.toString());
     assertEquals("boolean|number", JSType.join(BOOLEAN, NUMBER).toString());
     assertEquals("top", TOP.toString());
-    assertEquals("unknown", UNKNOWN.toString());
+    assertEquals("?", UNKNOWN.toString());
     assertEquals("function (): number", fromNothingToNumber.toString());
     assertEquals("function (): number|number",
         JSType.join(NUMBER, fromNothingToNumber).toString());

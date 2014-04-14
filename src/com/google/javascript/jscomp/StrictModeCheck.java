@@ -22,6 +22,7 @@ import com.google.javascript.jscomp.Scope.Var;
 import com.google.javascript.rhino.JSDocInfo;
 import com.google.javascript.rhino.Node;
 import com.google.javascript.rhino.Token;
+import com.google.javascript.rhino.jstype.JSType;
 
 import java.util.Set;
 
@@ -31,6 +32,8 @@ import java.util.Set;
  * <li> No use of "with".
  * <li> No deleting variables, functions, or arguments.
  * <li> No re-declarations or assignments of "eval" or arguments.
+ * <li> No use of arguments.callee
+ * <li> No use of arguments.caller
  * </ol>
  *
  */
@@ -59,6 +62,24 @@ class StrictModeCheck extends AbstractPostOrderCallback
   static final DiagnosticType ARGUMENTS_ASSIGNMENT = DiagnosticType.warning(
       "JSC_ARGUMENTS_ASSIGNMENT",
       "the \"arguments\" object cannot be reassigned in ES5 strict mode");
+
+  static final DiagnosticType ARGUMENTS_CALLEE_FORBIDDEN = DiagnosticType.warning(
+      "JSC_ARGUMENTS_CALLEE_FORBIDDEN",
+      "\"arguments.callee\" cannot be used in ES5 strict mode");
+
+  static final DiagnosticType ARGUMENTS_CALLER_FORBIDDEN = DiagnosticType.warning(
+      "JSC_ARGUMENTS_CALLER_FORBIDDEN",
+      "\"arguments.caller\" cannot be used in ES5 strict mode");
+
+  static final DiagnosticType FUNCTION_CALLER_FORBIDDEN = DiagnosticType.warning(
+      "JSC_FUNCTION_CALLER_FORBIDDEN",
+      "A function''s \"caller\" property cannot be used in ES5 strict mode");
+
+  static final DiagnosticType FUNCTION_ARGUMENTS_PROP_FORBIDDEN = DiagnosticType.warning(
+      "JSC_FUNCTION_ARGUMENTS_PROP_FORBIDDEN",
+      "A function''s \"arguments\" property cannot be used in ES5 strict mode");
+
+
 
   static final DiagnosticType DELETE_VARIABLE = DiagnosticType.warning(
       "JSC_DELETE_VARIABLE",
@@ -112,7 +133,7 @@ class StrictModeCheck extends AbstractPostOrderCallback
   }
 
   /** Reports a warning for with statements. */
-  private void checkWith(NodeTraversal t, Node n) {
+  private static void checkWith(NodeTraversal t, Node n) {
     JSDocInfo info = n.getJSDocInfo();
     boolean allowWith =
         info != null && info.getSuppressions().contains("with");
@@ -122,7 +143,7 @@ class StrictModeCheck extends AbstractPostOrderCallback
   }
 
   /** Checks that the function is used legally. */
-  private void checkFunctionUse(NodeTraversal t, Node n) {
+  private static void checkFunctionUse(NodeTraversal t, Node n) {
     if (NodeUtil.isFunctionDeclaration(n) && !NodeUtil.isHoistedFunctionDeclaration(n)) {
       t.report(n, BAD_FUNCTION_DECLARATION);
     }
@@ -160,7 +181,7 @@ class StrictModeCheck extends AbstractPostOrderCallback
   }
 
   /** Checks that an assignment is not to the "arguments" object. */
-  private void checkAssignment(NodeTraversal t, Node n) {
+  private static void checkAssignment(NodeTraversal t, Node n) {
     if (n.getFirstChild().isName()) {
       if ("arguments".equals(n.getFirstChild().getString())) {
         t.report(n, ARGUMENTS_ASSIGNMENT);
@@ -173,7 +194,7 @@ class StrictModeCheck extends AbstractPostOrderCallback
   }
 
   /** Checks that variables, functions, and arguments are not deleted. */
-  private void checkDelete(NodeTraversal t, Node n) {
+  private static void checkDelete(NodeTraversal t, Node n) {
     if (n.getFirstChild().isName()) {
       Var v = t.getScope().getVar(n.getFirstChild().getString());
       if (v != null) {
@@ -183,7 +204,7 @@ class StrictModeCheck extends AbstractPostOrderCallback
   }
 
   /** Checks that object literal keys are valid. */
-  private void checkObjectLiteral(NodeTraversal t, Node n) {
+  private static void checkObjectLiteral(NodeTraversal t, Node n) {
     Set<String> getters = Sets.newHashSet();
     Set<String> setters = Sets.newHashSet();
     for (Node key = n.getFirstChild();
@@ -209,10 +230,12 @@ class StrictModeCheck extends AbstractPostOrderCallback
   }
 
   /** Checks that are performed on non-extern code only. */
-  private class NonExternChecks extends AbstractPostOrderCallback {
+  private static class NonExternChecks extends AbstractPostOrderCallback {
     @Override public void visit(NodeTraversal t, Node n, Node parent) {
       if ((n.isName()) && isDeclaration(n)) {
         checkDeclaration(t, n);
+      } else if (n.isGetProp()) {
+        checkGetProp(t, n);
       }
     }
 
@@ -224,5 +247,30 @@ class StrictModeCheck extends AbstractPostOrderCallback
         t.report(n, ARGUMENTS_DECLARATION);
       }
     }
+
+    /** Checks that the arguments.callee is not used. */
+    private void checkGetProp(NodeTraversal t, Node n) {
+      Node target = n.getFirstChild();
+      Node prop = n.getLastChild();
+      if (prop.getString().equals("callee")) {
+        if (target.isName() && target.getString().equals("arguments")) {
+          t.report(n, ARGUMENTS_CALLEE_FORBIDDEN);
+        }
+      } else if (prop.getString().equals("caller")) {
+        if (target.isName() && target.getString().equals("arguments")) {
+          t.report(n, ARGUMENTS_CALLER_FORBIDDEN);
+        } else if (isFunctionType(target)) {
+          t.report(n, FUNCTION_CALLER_FORBIDDEN);
+        }
+      } else if (prop.getString().equals("arguments")
+          && isFunctionType(target)) {
+        t.report(n, FUNCTION_ARGUMENTS_PROP_FORBIDDEN);
+      }
+    }
+  }
+
+  private static boolean isFunctionType(Node n) {
+    JSType type = n.getJSType();
+    return (type != null && type.isFunctionType());
   }
 }

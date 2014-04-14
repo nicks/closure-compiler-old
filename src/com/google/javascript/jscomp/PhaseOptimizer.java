@@ -86,7 +86,7 @@ class PhaseOptimizer implements CompilerPass {
     RUN_PASSES_THAT_CHANGED_STH_IN_PREV_ITER
   }
 
-  // NOTE(user): There used to be some code that tried various orderings of
+  // NOTE(dimvar): There used to be some code that tried various orderings of
   // loopable passes and picked the fastest one. This code became stale
   // gradually and I decided to remove it. It was also never tried after the
   // new pass scheduler was written. If we need to revisit this order in the
@@ -265,10 +265,16 @@ class PhaseOptimizer implements CompilerPass {
         tracker.recordPassStart(name, factory.isOneTimePass());
       }
       tracer = new Tracer("JSCompiler");
+
+      compiler.beforePass(name);
+
       // Delay the creation of the actual pass until *after* all previous passes
       // have been processed.
       // Some precondition checks rely on this, eg, in CoalesceVariableNames.
       factory.create(compiler).process(externs, root);
+
+      compiler.afterPass(name);
+
       try {
         if (progressRange == null) {
           compiler.setProgress(-1, name);
@@ -404,7 +410,7 @@ class PhaseOptimizer implements CompilerPass {
       setScope(root);
       // lastRuns is initialized before each loop. This way, when a pass is run
       // in the 2nd loop for the 1st time, it looks at all scopes.
-      lastRuns = new HashMap<NamedPass, Integer>();
+      lastRuns = new HashMap<>();
       for (NamedPass pass : myPasses) {
         lastRuns.put(pass, START_TIME);
       }

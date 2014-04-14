@@ -27,8 +27,9 @@ import com.google.javascript.rhino.JSDocInfo;
 import com.google.javascript.rhino.Node;
 import com.google.javascript.rhino.Token;
 
-import java.util.*;
-import java.util.regex.*;
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Pattern;
 
 import javax.annotation.Nullable;
 
@@ -462,7 +463,7 @@ abstract class JsMessageVisitor extends AbstractPostOrderCallback
    * @param sibling a node adjacent to the message VAR node
    * @return true iff message has corresponding description variable
    */
-  private boolean maybeInitMetaDataFromHelpVar(Builder builder,
+  private static boolean maybeInitMetaDataFromHelpVar(Builder builder,
       @Nullable Node sibling) throws MalformedException {
     if ((sibling != null) && (sibling.isVar())) {
       Node nameNode = sibling.getFirstChild();
@@ -491,7 +492,7 @@ abstract class JsMessageVisitor extends AbstractPostOrderCallback
    * @return true if message has JsDoc with valid description in @desc
    *         annotation
    */
-  private boolean maybeInitMetaDataFromJsDoc(Builder builder, Node node) {
+  private static boolean maybeInitMetaDataFromJsDoc(Builder builder, Node node) {
     boolean messageHasDesc = false;
     JSDocInfo info = node.getJSDocInfo();
     if (info != null) {
@@ -621,7 +622,7 @@ abstract class JsMessageVisitor extends AbstractPostOrderCallback
    * @param node the node from where we extract a message
    * @throws MalformedException if the parsed message is invalid
    */
-  private void extractFromReturnDescendant(Builder builder, Node node)
+  private static void extractFromReturnDescendant(Builder builder, Node node)
       throws MalformedException {
 
     switch (node.getType()) {
@@ -751,7 +752,7 @@ abstract class JsMessageVisitor extends AbstractPostOrderCallback
    * @throws MalformedException if {@code value} contains a reference to
    *         an unregistered placeholder
    */
-  private void parseMessageTextNode(Builder builder, Node node)
+  private static void parseMessageTextNode(Builder builder, Node node)
       throws MalformedException {
     String value = extractStringFromStringExprNode(node);
 

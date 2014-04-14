@@ -22,7 +22,8 @@ import com.google.javascript.rhino.JSDocInfo;
 import com.google.javascript.rhino.Node;
 import com.google.javascript.rhino.Token;
 
-import java.util.*;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Verifies that constants are only assigned a value once.
@@ -48,7 +49,7 @@ class ConstCheck extends AbstractPostOrderCallback
    */
   public ConstCheck(AbstractCompiler compiler) {
     this.compiler = compiler;
-    this.initializedConstants = new HashSet<Scope.Var>();
+    this.initializedConstants = new HashSet<>();
   }
 
   @Override
@@ -127,7 +128,7 @@ class ConstCheck extends AbstractPostOrderCallback
    * Gets whether a variable is a constant initialized to a literal value at
    * the point where it is declared.
    */
-  private boolean isConstant(Scope.Var var) {
+  private static boolean isConstant(Scope.Var var) {
     return var != null && var.isConst();
   }
 

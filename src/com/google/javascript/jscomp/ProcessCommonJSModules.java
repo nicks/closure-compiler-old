@@ -25,8 +25,6 @@ import com.google.javascript.rhino.JSDocInfo;
 import com.google.javascript.rhino.Node;
 import com.google.javascript.rhino.Token;
 
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.List;
 import java.util.regex.Pattern;
 

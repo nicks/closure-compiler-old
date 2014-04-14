@@ -239,7 +239,7 @@ final class RescopeGlobalSymbols implements CompilerPass {
       }
       String name = n.getString();
       // Ignore anonymous functions
-      if (parent.isFunction() && name.length() == 0) {
+      if (parent.isFunction() && name.isEmpty()) {
         return;
       }
       Scope.Var var = t.getScope().getVar(name);
@@ -352,8 +352,8 @@ final class RescopeGlobalSymbols implements CompilerPass {
         return;
       }
 
-      List<Node> commas = new ArrayList<Node>();
-      List<Node> interestingChildren = new ArrayList<Node>();
+      List<Node> commas = new ArrayList<>();
+      List<Node> interestingChildren = new ArrayList<>();
       // Filter out declarations without assignments.
       // As opposed to regular var nodes, there are always assignments
       // because the previous traversal in RewriteScopeCallback creates

@@ -35,7 +35,7 @@ import java.util.Map;
  * @author dimvar@google.com (Dimitris Vardoulakis)
  */
 public class FunctionTypeBuilder {
-  class WrongParameterOrderException extends RuntimeException {
+  static class WrongParameterOrderException extends RuntimeException {
     WrongParameterOrderException(String message) {
       super(message);
     }
@@ -72,11 +72,13 @@ public class FunctionTypeBuilder {
 
   public FunctionTypeBuilder addOptFormal(JSType t)
       throws WrongParameterOrderException {
+    Preconditions.checkNotNull(t);
     if (restFormals != null) {
       throw new WrongParameterOrderException(
           "Cannot add optional formal after rest args");
     }
-    optionalFormals.add(t);
+    // We keep bottom to warn about CALL_FUNCTION_WITH_BOTTOM_FORMAL.
+    optionalFormals.add(t.isBottom() ? t : JSType.join(t, JSType.UNDEFINED));
     return this;
   }
 

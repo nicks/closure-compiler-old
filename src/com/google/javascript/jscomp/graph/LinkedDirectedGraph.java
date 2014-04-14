@@ -46,23 +46,23 @@ public class LinkedDirectedGraph<N, E>
 
   @Override
   public SubGraph<N, E> newSubGraph() {
-    return new SimpleSubGraph<N, E>(this);
+    return new SimpleSubGraph<>(this);
   }
 
   public static <N, E> LinkedDirectedGraph<N, E> createWithoutAnnotations() {
-    return new LinkedDirectedGraph<N, E>(false, false);
+    return new LinkedDirectedGraph<>(false, false);
   }
 
   public static <N, E> LinkedDirectedGraph<N, E> createWithNodeAnnotations() {
-    return new LinkedDirectedGraph<N, E>(true, false);
+    return new LinkedDirectedGraph<>(true, false);
   }
 
   public static <N, E> LinkedDirectedGraph<N, E> createWithEdgeAnnotations() {
-    return new LinkedDirectedGraph<N, E>(false, true);
+    return new LinkedDirectedGraph<>(false, true);
   }
 
   public static <N, E> LinkedDirectedGraph<N, E> create() {
-    return new LinkedDirectedGraph<N, E>(true, true);
+    return new LinkedDirectedGraph<>(true, true);
   }
 
   private final boolean useNodeAnnotations;
@@ -80,8 +80,8 @@ public class LinkedDirectedGraph<N, E>
     LinkedDirectedGraphNode<N, E> dest = getNodeOrFail(destValue);
     LinkedDirectedGraphEdge<N, E> edge =
         useEdgeAnnotations ?
-        new AnnotatedLinkedDirectedGraphEdge<N, E>(src, edgeValue, dest) :
-        new LinkedDirectedGraphEdge<N, E>(src, edgeValue, dest);
+        new AnnotatedLinkedDirectedGraphEdge<>(src, edgeValue, dest) :
+        new LinkedDirectedGraphEdge<>(src, edgeValue, dest);
     src.getOutEdges().add(edge);
     dest.getInEdges().add(edge);
   }
@@ -121,13 +121,13 @@ public class LinkedDirectedGraph<N, E>
   @Override
   public List<DiGraphEdge<N, E>> getInEdges(N nodeValue) {
     LinkedDirectedGraphNode<N, E> node = getNodeOrFail(nodeValue);
-    return Collections.<DiGraphEdge<N, E>>unmodifiableList(node.getInEdges());
+    return Collections.unmodifiableList(node.getInEdges());
   }
 
   @Override
   public List<DiGraphEdge<N, E>> getOutEdges(N nodeValue) {
     LinkedDirectedGraphNode<N, E> node = getNodeOrFail(nodeValue);
-    return Collections.<DiGraphEdge<N, E>>unmodifiableList(node.getOutEdges());
+    return Collections.unmodifiableList(node.getOutEdges());
   }
 
   @Override

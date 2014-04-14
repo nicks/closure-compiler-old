@@ -20,9 +20,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
 
@@ -37,167 +35,203 @@ import java.util.SortedSet;
  * @author dimvar@google.com (Dimitris Vardoulakis)
  */
 public class ObjectType {
-  // TODO(user): currently, we can't distinguish between an obj at the top of
+  // TODO(dimvar): currently, we can't distinguish between an obj at the top of
   // the proto chain (nominalType = null) and an obj for which we can't figure
   // out its class
   private final NominalType nominalType;
   private final FunctionType fn;
   private final boolean isLoose;
-  private final ImmutableMap<String, Property> props;
+  private final PersistentMap<String, Property> props;
+  private final ObjectKind objectKind;
 
-  static final ObjectType TOP_OBJECT =
-      ObjectType.makeObjectType(null, null, null, false);
+  static final ObjectType TOP_OBJECT = ObjectType.makeObjectType(
+      null, null, null, false, ObjectKind.UNRESTRICTED);
+  static final ObjectType TOP_STRUCT = ObjectType.makeObjectType(
+      null, null, null, false, ObjectKind.STRUCT);
+  static final ObjectType TOP_DICT = ObjectType.makeObjectType(
+      null, null, null, false, ObjectKind.DICT);
 
   private ObjectType(NominalType nominalType,
-      ImmutableMap<String, Property> props, FunctionType fn, boolean isLoose) {
+      PersistentMap<String, Property> props, FunctionType fn, boolean isLoose,
+      ObjectKind objectKind) {
+    Preconditions.checkState(nominalType == null || !isLoose);
     this.nominalType = nominalType;
     this.props = props;
     this.fn = fn;
     this.isLoose = isLoose;
+    this.objectKind = objectKind;
   }
 
   static ObjectType makeObjectType(NominalType nominalType,
-      Map<String, Property> props, FunctionType fn, boolean isLoose) {
+      PersistentMap<String, Property> props, FunctionType fn,
+      boolean isLoose, ObjectKind ok) {
     if (props == null) {
-      props = ImmutableMap.of();
+      props = PersistentMap.create();
     }
-    return new ObjectType(nominalType, ImmutableMap.copyOf(props), fn, isLoose);
+    return new ObjectType(nominalType, props, fn, isLoose, ok);
   }
 
   static ObjectType fromFunction(FunctionType fn) {
-    return ObjectType.makeObjectType(null, null, fn, fn.isLoose());
+    return ObjectType.makeObjectType(
+        null, null, fn, fn.isLoose(), ObjectKind.UNRESTRICTED);
   }
 
   public static ObjectType fromNominalType(NominalType cl) {
-    return ObjectType.makeObjectType(cl, null, null, false);
+    return ObjectType.makeObjectType(cl, null, null, false, cl.getObjectKind());
   }
 
   /** Construct an object with the given declared non-optional properties. */
-  static ObjectType fromProperties(Map<String, JSType> props) {
-    ImmutableMap.Builder<String, Property> builder = ImmutableMap.builder();
-    for (String propName : props.keySet()) {
-      JSType propType = props.get(propName);
-      builder.put(propName, new Property(propType, propType, false));
+  static ObjectType fromProperties(Map<String, JSType> propTypes) {
+    PersistentMap<String, Property> props = PersistentMap.create();
+    for (String propName : propTypes.keySet()) {
+      JSType propType = propTypes.get(propName);
+      props = props.with(propName, new Property(propType, propType, false));
     }
-    return ObjectType.makeObjectType(null, builder.build(), null, false);
+    return ObjectType.makeObjectType(
+        null, props, null, false, ObjectKind.UNRESTRICTED);
   }
 
   boolean isInhabitable() {
-    for (String pname: props.keySet()) {
+    for (String pname : props.keySet()) {
       if (!props.get(pname).getType().isInhabitable()) {
         return false;
       }
     }
-    // TODO(user): do we need a stricter check for functions?
+    // TODO(dimvar): do we need a stricter check for functions?
     return true;
+  }
+
+  boolean isStruct() {
+    return objectKind.isStruct();
+  }
+
+  boolean isLooseStruct() {
+    return isLoose && objectKind.isStruct();
+  }
+
+  boolean isDict() {
+    return objectKind.isDict();
   }
 
   static ImmutableSet<ObjectType> withLooseObjects(Set<ObjectType> objs) {
     ImmutableSet.Builder<ObjectType> newObjs = ImmutableSet.builder();
-    for (ObjectType obj: objs) {
+    for (ObjectType obj : objs) {
       newObjs.add(obj.withLoose());
     }
     return newObjs.build();
   }
 
   private ObjectType withLoose() {
-    if (this.nominalType != null) { // Don't loosen nominal types
+    // Don't loosen nominal types
+    if (this.nominalType != null) {
       return this;
     }
     FunctionType fn = this.fn == null ? null : this.fn.withLoose();
-    Map<String, Property> newProps = Maps.newHashMap();
-    for (String pname: this.props.keySet()) {
+    PersistentMap<String, Property> newProps = PersistentMap.create();
+    for (String pname : this.props.keySet()) {
       // It's wrong to warn about a possibly absent property on loose objects.
-      newProps.put(pname, this.props.get(pname).withRequired());
+      newProps = newProps.with(pname, this.props.get(pname).withRequired());
     }
-    return ObjectType.makeObjectType(nominalType, newProps, fn, true);
+    return ObjectType.makeObjectType(
+        nominalType, newProps, fn, true, this.objectKind);
   }
 
   static ImmutableSet<ObjectType> withoutProperty(
-      Set<ObjectType> objs, String qname) {
+      Set<ObjectType> objs, QualifiedName qname) {
     ImmutableSet.Builder<ObjectType> newObjs = ImmutableSet.builder();
-    for (ObjectType obj: objs) {
+    for (ObjectType obj : objs) {
       newObjs.add(obj.withProperty(qname, null));
     }
     return newObjs.build();
   }
 
+  // If the property is already declared, but isDeclared is false, be careful
+  // to not un-declare it.
   private ObjectType withPropertyHelper(
-      String qname, JSType type, boolean isDeclared) {
+      QualifiedName qname, JSType type, boolean isDeclared) {
     // TODO(blickly): If the prop exists with right type, short circuit here.
-    Map<String, Property> newProps = Maps.newHashMap(this.props);
-    if (TypeUtils.isIdentifier(qname)) {
+    PersistentMap<String, Property> newProps = this.props;
+    String objName = qname.getLeftmostName();
+    if (qname.isIdentifier()) {
       if (type == null) {
-        newProps.remove(qname);
+        newProps = newProps.without(objName);
       } else {
-        newProps.put(qname,
-            new Property(type, isDeclared ? type : null, false));
+        JSType declType = getDeclaredProp(qname);
+        Preconditions.checkState(declType == null ||
+            type.isSubtypeOf(declType));
+        if (isDeclared) {
+          declType = type;
+        } else if (declType != null) {
+          isDeclared = true;
+        }
+        newProps = newProps.with(objName,
+            new Property(type, isDeclared ? declType : null, false));
       }
     } else { // This has a nested object
-      String objName = qname.substring(0, qname.indexOf('.'));
-      String innerProps = qname.substring(qname.indexOf('.') + 1);
+      QualifiedName objQname = new QualifiedName(objName);
+      QualifiedName innerProps = qname.getAllButLeftmost();
       if (!this.props.containsKey(objName)) {
-        Preconditions.checkState(mayHaveProp(objName));
-        newProps.put(objName, getLeftmostProp(objName));
+        Preconditions.checkState(mayHaveProp(objQname));
+        newProps = newProps.with(objName, getLeftmostProp(objQname));
       }
       Property objProp = newProps.get(objName);
-      newProps.put(objName,
+      newProps = newProps.with(objName,
           new Property(objProp.getType().withProperty(innerProps, type),
             objProp.getDeclaredType(), objProp.isOptional()));
     }
-    return ObjectType.makeObjectType(nominalType, newProps, fn, isLoose);
+    return ObjectType.makeObjectType(
+        nominalType, newProps, fn, isLoose, objectKind);
   }
 
-  ObjectType withProperty(String qname, JSType type) {
+  ObjectType withProperty(QualifiedName qname, JSType type) {
     return withPropertyHelper(qname, type, false);
   }
 
   static ImmutableSet<ObjectType> withProperty(
-      Set<ObjectType> objs, String qname, JSType type) {
+      Set<ObjectType> objs, QualifiedName qname, JSType type) {
     ImmutableSet.Builder<ObjectType> newObjs = ImmutableSet.builder();
-    for (ObjectType obj: objs) {
+    for (ObjectType obj : objs) {
       newObjs.add(obj.withProperty(qname, type));
     }
     return newObjs.build();
   }
 
   static ImmutableSet<ObjectType> withDeclaredProperty(
-      Set<ObjectType> objs, String qname, JSType type) {
+      Set<ObjectType> objs, QualifiedName qname, JSType type) {
     ImmutableSet.Builder<ObjectType> newObjs = ImmutableSet.builder();
-    for (ObjectType obj: objs) {
+    for (ObjectType obj : objs) {
       newObjs.add(obj.withPropertyHelper(qname, type, true));
     }
     return newObjs.build();
   }
 
-  private ObjectType withPropertyRequired(String qname) {
-    Preconditions.checkArgument(TypeUtils.isIdentifier(qname));
-    Map<String, Property> newProps = Maps.newHashMap(this.props);
-    Property oldProp = this.props.get(qname);
+  private ObjectType withPropertyRequired(String pname) {
+    Property oldProp = this.props.get(pname);
     Property newProp = oldProp == null ?
         new Property(JSType.UNKNOWN, null, false) :
         new Property(oldProp.getType(), oldProp.getDeclaredType(), false);
-    newProps.put(qname, newProp);
-    return ObjectType.makeObjectType(nominalType, newProps, fn, isLoose);
+    return ObjectType.makeObjectType(
+        nominalType, this.props.with(pname, newProp), fn,
+        isLoose, this.objectKind);
   }
 
   static ImmutableSet<ObjectType> withPropertyRequired(
-      Set<ObjectType> objs, String qname) {
+      Set<ObjectType> objs, String pname) {
     ImmutableSet.Builder<ObjectType> newObjs = ImmutableSet.builder();
-    for (ObjectType obj: objs) {
-      newObjs.add(obj.withPropertyRequired(qname));
+    for (ObjectType obj : objs) {
+      newObjs.add(obj.withPropertyRequired(pname));
     }
     return newObjs.build();
   }
 
-  private static Map<String, Property> meetPropsHelper(
+  private static PersistentMap<String, Property> meetPropsHelper(
       boolean specializeProps1,
       NominalType resultNominalType,
       Map<String, Property> props1, Map<String, Property> props2) {
-    Map<String, Property> newProps = Maps.newHashMap();
+    PersistentMap<String, Property> newProps = PersistentMap.create();
     for (String pname : props1.keySet()) {
       if (!props2.containsKey(pname)) {
-        mayPutProp(pname, props1.get(pname), newProps, resultNominalType);
+        newProps = mayPutProp(pname, props1.get(pname), newProps, resultNominalType);
       }
     }
     for (String pname : props2.keySet()) {
@@ -210,65 +244,69 @@ public class ObjectType {
       } else {
         newProp = prop2;
       }
-      mayPutProp(pname, newProp, newProps, resultNominalType);
+      newProps = mayPutProp(pname, newProp, newProps, resultNominalType);
     }
     return newProps;
   }
 
-  private static void mayPutProp(String pname, Property prop,
-      Map<String, Property> props, NominalType nom) {
+  private static PersistentMap<String, Property> mayPutProp(
+      String pname, Property prop,
+      PersistentMap<String, Property> props,
+      NominalType nom) {
     Property nomProp = nom == null ? null : nom.getProp(pname);
     JSType propType = prop.getType();
     if (nomProp == null ||
         (!propType.isUnknown() && propType.isSubtypeOf(nomProp.getType()))) {
-      props.put(pname, prop);
+      props = props.with(pname, prop);
     }
+    return props;
   }
 
-  private static Map<String, Property> joinProps(
+  private static PersistentMap<String, Property> joinProps(
       Map<String, Property> props1, Map<String, Property> props2) {
-    Map<String, Property> newProps = Maps.newHashMap();
+    PersistentMap<String, Property> newProps = PersistentMap.create();
     for (String pname : props1.keySet()) {
       if (!props2.containsKey(pname)) {
-        newProps.put(pname, props1.get(pname).withOptional());
+        newProps = newProps.with(pname, props1.get(pname).withOptional());
       }
     }
     for (String pname : props2.keySet()) {
       Property prop2 = props2.get(pname);
       if (props1.containsKey(pname)) {
-        newProps.put(pname, Property.join(props1.get(pname), prop2));
+        newProps = newProps.with(pname, Property.join(props1.get(pname), prop2));
       } else {
-        newProps.put(pname, prop2.withOptional());
+        newProps = newProps.with(pname, prop2.withOptional());
       }
     }
     return newProps;
   }
 
-  private static Map<String, Property> joinPropsLoosely(
+  private static PersistentMap<String, Property> joinPropsLoosely(
       Map<String, Property> props1, Map<String, Property> props2) {
-    Map<String, Property> newProps = Maps.newHashMap();
+    PersistentMap<String, Property> newProps = PersistentMap.create();
     for (String pname : props1.keySet()) {
       if (!props2.containsKey(pname)) {
-        newProps.put(pname, props1.get(pname).withRequired());
+        newProps = newProps.with(pname, props1.get(pname).withRequired());
       }
     }
     for (String pname : props2.keySet()) {
       Property prop2 = props2.get(pname);
       if (props1.containsKey(pname)) {
-        newProps.put(pname,
+        newProps = newProps.with(pname,
             Property.join(props1.get(pname), prop2).withRequired());
       } else {
-        newProps.put(pname, prop2.withRequired());
+        newProps = newProps.with(pname, prop2.withRequired());
       }
     }
     return newProps;
   }
 
-  static boolean isUnionSubtype(Set<ObjectType> objs1, Set<ObjectType> objs2) {
-    for (ObjectType obj1: objs1) {
+  static boolean isUnionSubtype(boolean keepLoosenessOfThis,
+      Set<ObjectType> objs1, Set<ObjectType> objs2) {
+    for (ObjectType obj1 : objs1) {
       boolean foundSupertype = false;
-      for (ObjectType obj2: objs2) {
-        if (obj1.isSubtypeOf(obj2)) {
+      for (ObjectType obj2 : objs2) {
+        if (obj1.isSubtypeOf(keepLoosenessOfThis, obj2)) {
           foundSupertype = true;
           break;
         }
@@ -280,21 +318,34 @@ public class ObjectType {
     return true;
   }
 
+  boolean isSubtypeOf(ObjectType obj2) {
+    return isSubtypeOf(true, obj2);
+  }
+
   /**
-   * Required properties are acceptable where a optional is required,
+   * Required properties are acceptable where an optional is required,
    * but not vice versa.
    * Optional properties create cycles in the type lattice, eg,
    * { } \le { p: num= }  and also   { p: num= } \le { }.
    */
-  boolean isSubtypeOf(ObjectType obj2) {
-    if (this.isLoose || obj2.isLoose) {
+  boolean isSubtypeOf(boolean keepLoosenessOfThis, ObjectType obj2) {
+    if (obj2 == TOP_OBJECT) {
+      return true;
+    }
+
+    if ((keepLoosenessOfThis && this.isLoose) || obj2.isLoose) {
       return this.isLooseSubtypeOf(obj2);
     }
+
+    if (!objectKind.isSubtypeOf(obj2.objectKind)) {
+      return false;
+    }
+
     // If nominalType1 < nominalType2, we only need to check that the
     // properties of obj2 are in (obj1 or nominalType1)
     for (String pname : obj2.props.keySet()) {
       Property prop2 = obj2.props.get(pname);
-      Property prop1 = this.getLeftmostProp(pname);
+      Property prop1 = this.getLeftmostProp(new QualifiedName(pname));
 
       if (prop2.isOptional()) {
         if (prop1 != null && !prop1.getType().isSubtypeOf(prop2.getType())) {
@@ -323,18 +374,35 @@ public class ObjectType {
     return this.fn.isSubtypeOf(obj2.fn);
   }
 
+  // We never infer properties as optional on loose objects,
+  // and we don't warn about possibly inexistent properties.
   boolean isLooseSubtypeOf(ObjectType obj2) {
+    Preconditions.checkState(isLoose || obj2.isLoose);
     if (obj2 == TOP_OBJECT) {
       return true;
     }
-    for (String pname: obj2.props.keySet()) {
-      if (props.containsKey(pname)) {
-        if (!props.get(pname).getType()
-            .isSubtypeOf(obj2.props.get(pname).getType())) {
+
+    if (!isLoose) {
+      if (!objectKind.isSubtypeOf(obj2.objectKind)) {
+        return false;
+      }
+      for (String pname : obj2.props.keySet()) {
+        QualifiedName qname = new QualifiedName(pname);
+        if (!mayHaveProp(qname) ||
+            !getProp(qname).isSubtypeOf(obj2.getProp(qname))) {
+          return false;
+        }
+      }
+    } else { // this is loose, obj2 may be loose
+      for (String pname : props.keySet()) {
+        QualifiedName qname = new QualifiedName(pname);
+        if (obj2.mayHaveProp(qname) &&
+            !getProp(qname).isSubtypeOf(obj2.getProp(qname))) {
           return false;
         }
       }
     }
+
     if (obj2.fn == null) {
       return true;
     } else if (this.fn == null) {
@@ -344,16 +412,17 @@ public class ObjectType {
     return fn.isLooseSubtypeOf(obj2.fn);
   }
 
-  ObjectType specialize(ObjectType obj2) {
+  ObjectType specialize(ObjectType other) {
     Preconditions.checkState(
-        areRelatedClasses(this.nominalType, obj2.nominalType));
+        areRelatedClasses(this.nominalType, other.nominalType));
     NominalType resultNominalType =
-        NominalType.pickSubclass(this.nominalType, obj2.nominalType);
+        NominalType.pickSubclass(this.nominalType, other.nominalType);
     return ObjectType.makeObjectType(
         resultNominalType,
-        meetPropsHelper(true, resultNominalType, this.props, obj2.props),
-        (fn == null) ? null : fn.specialize(obj2.fn),
-        this.isLoose || obj2.isLoose);
+        meetPropsHelper(true, resultNominalType, this.props, other.props),
+        (fn == null) ? null : fn.specialize(other.fn),
+        resultNominalType == null && this.isLoose,
+        ObjectKind.meet(this.objectKind, other.objectKind));
   }
 
   static ObjectType meet(ObjectType obj1, ObjectType obj2) {
@@ -365,7 +434,8 @@ public class ObjectType {
         resultNominalType,
         meetPropsHelper(false, resultNominalType, obj1.props, obj2.props),
         FunctionType.meet(obj1.fn, obj2.fn),
-        obj1.isLoose || obj2.isLoose);
+        obj1.isLoose && obj2.isLoose,
+        ObjectKind.meet(obj1.objectKind, obj2.objectKind));
   }
 
   static ObjectType join(ObjectType obj1, ObjectType obj2) {
@@ -377,7 +447,8 @@ public class ObjectType {
           joinPropsLoosely(obj1.props, obj2.props) :
           joinProps(obj1.props, obj2.props),
         FunctionType.join(obj1.fn, obj2.fn),
-        obj1.isLoose || obj2.isLoose);
+        obj1.isLoose || obj2.isLoose,
+        ObjectKind.join(obj1.objectKind, obj2.objectKind));
   }
 
   static ImmutableSet<ObjectType> joinSets(
@@ -388,9 +459,9 @@ public class ObjectType {
       return objs1;
     }
     Set<ObjectType> newObjs = Sets.newHashSet(objs1);
-    for (ObjectType obj2: objs2) {
+    for (ObjectType obj2 : objs2) {
       boolean addedObj2 = false;
-      for (ObjectType obj1: objs1) {
+      for (ObjectType obj1 : objs1) {
         NominalType nominalType1 = obj1.nominalType;
         NominalType nominalType2 = obj2.nominalType;
         if (areRelatedClasses(nominalType1, nominalType2)) {
@@ -424,13 +495,13 @@ public class ObjectType {
   static ImmutableSet<ObjectType> meetSetsHelper(
       boolean specializeObjs1,
       Set<ObjectType> objs1, Set<ObjectType> objs2) {
-    // TODO(user): handle greatest lower bound of interface types
+    // TODO(dimvar): handle greatest lower bound of interface types
     if (objs1 == null || objs2 == null) {
       return null;
     }
     ImmutableSet.Builder<ObjectType> newObjs = ImmutableSet.builder();
-    for (ObjectType obj2: objs2) {
-      for (ObjectType obj1: objs1) {
+    for (ObjectType obj2 : objs2) {
+      for (ObjectType obj1 : objs1) {
         if (areRelatedClasses(obj1.nominalType, obj2.nominalType)) {
           newObjs.add(specializeObjs1 ?
               obj1.specialize(obj2) : meet(obj1, obj2));
@@ -457,13 +528,13 @@ public class ObjectType {
     return fn;
   }
 
-  JSType getProp(String qname) {
+  JSType getProp(QualifiedName qname) {
     Property p = getLeftmostProp(qname);
-    if (TypeUtils.isIdentifier(qname)) {
+    if (qname.isIdentifier()) {
       return p == null ? JSType.UNDEFINED : p.getType();
     } else {
       Preconditions.checkState(p != null);
-      return p.getType().getProp(TypeUtils.getPropPath(qname));
+      return p.getType().getProp(qname.getAllButLeftmost());
     }
   }
 
@@ -471,25 +542,23 @@ public class ObjectType {
     return nominalType;
   }
 
-  boolean mayHaveProp(String qname) {
+  boolean mayHaveProp(QualifiedName qname) {
     Property p = getLeftmostProp(qname);
     return p != null &&
-        (TypeUtils.isIdentifier(qname) ||
-        p.getType().mayHaveProp(TypeUtils.getPropPath(qname)));
+        (qname.isIdentifier() ||
+        p.getType().mayHaveProp(qname.getAllButLeftmost()));
   }
 
-  boolean hasProp(String pname) {
-    Preconditions.checkArgument(TypeUtils.isIdentifier(pname));
-    Property p = getLeftmostProp(pname);
+  boolean hasProp(QualifiedName qname) {
+    Property p = getLeftmostProp(qname);
     if (p == null || p.isOptional()) {
       return false;
     }
     return true;
   }
 
-  JSType getDeclaredProp(String pname) {
-    Preconditions.checkArgument((TypeUtils.isIdentifier(pname)));
-    Property p = getLeftmostProp(pname);
+  JSType getDeclaredProp(QualifiedName qname) {
+    Property p = getLeftmostProp(qname);
     if (p == null) {
       return null;
     } else {
@@ -497,8 +566,8 @@ public class ObjectType {
     }
   }
 
-  private Property getLeftmostProp(String qname) {
-    String objName = TypeUtils.getQnameRoot(qname);
+  private Property getLeftmostProp(QualifiedName qname) {
+    String objName = qname.getLeftmostName();
     Property p = props.get(objName);
     if (p == null && nominalType != null) {
       p = nominalType.getProp(objName);
@@ -520,7 +589,7 @@ public class ObjectType {
     if (t1.fn != t2.fn) {
       throw new RuntimeException("Unification of functions not yet supported");
     }
-    Map<String, Property> newprops = Maps.newHashMap();
+    PersistentMap<String, Property> newProps = PersistentMap.create();
     for (String propName : t1.props.keySet()) {
       Property prop1 = t1.props.get(propName);
       Property prop2 = t2.props.get(propName);
@@ -531,9 +600,11 @@ public class ObjectType {
       if (p == null) {
         return null;
       }
-      newprops.put(propName, p);
+      newProps = newProps.with(propName, p);
     }
-    return makeObjectType(t1.nominalType, newprops, t1.fn, t1.isLoose || t2.isLoose);
+    return makeObjectType(t1.nominalType, newProps, t1.fn,
+        t1.isLoose || t2.isLoose,
+        ObjectKind.join(t1.objectKind, t2.objectKind));
   }
 
   /**
@@ -569,20 +640,18 @@ public class ObjectType {
   }
 
   ObjectType substituteGenerics(Map<String, JSType> concreteTypes) {
-    ImmutableMap<String, Property> newProps = null;
-    if (props != null) {
-      ImmutableMap.Builder<String, Property> builder = ImmutableMap.builder();
-      for (String p: props.keySet()) {
-        builder.put(p, props.get(p).substituteGenerics(concreteTypes));
-      }
-      newProps = builder.build();
+    PersistentMap<String, Property> newProps = PersistentMap.create();
+    for (String p : props.keySet()) {
+      newProps =
+          newProps.with(p, props.get(p).substituteGenerics(concreteTypes));
     }
     return new ObjectType(
         nominalType == null ? null :
         nominalType.instantiateGenerics(concreteTypes),
         newProps,
         fn == null ? null : fn.substituteGenerics(concreteTypes),
-        isLoose);
+        isLoose,
+        objectKind);
   }
 
   @Override
@@ -596,7 +665,16 @@ public class ObjectType {
     for (String pname : props.keySet()) {
       propStrings.add(pname + " : " + props.get(pname).toString());
     }
-    String result = nominalType == null ? "" : nominalType.toString();
+    String result;
+    if (nominalType != null) {
+      result = nominalType.toString();
+    } else if (isStruct()) {
+      result = "struct";
+    } else if (isDict()) {
+      result = "dict";
+    } else {
+      result = "";
+    }
     result += (nominalType != null && propStrings.isEmpty()) ?
         "" : "{" + Joiner.on(", ").join(propStrings) + "}";
     result += (isLoose ? " (loose)" : "");

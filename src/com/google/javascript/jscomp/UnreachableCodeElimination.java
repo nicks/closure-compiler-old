@@ -43,7 +43,7 @@ import java.util.logging.Logger;
  *
  */
 
-// TODO(user): Besides dead code after returns, this pass removes useless live
+// TODO(dimvar): Besides dead code after returns, this pass removes useless live
 // code such as breaks/continues/returns and stms w/out side effects.
 // These things don't require reachability info, consider making them their own
 // pass or putting them in some other, more related pass.
@@ -71,7 +71,7 @@ class UnreachableCodeElimination implements CompilerPass {
               new ControlFlowAnalysis(compiler, false, false);
           cfa.process(null, root);
           ControlFlowGraph<Node> cfg = cfa.getCfg();
-          new GraphReachability<Node, ControlFlowGraph.Branch>(cfg)
+          new GraphReachability<>(cfg)
               .compute(cfg.getEntry().getValue());
           if (root.isFunction()) {
             root = root.getLastChild();
@@ -122,7 +122,7 @@ class UnreachableCodeElimination implements CompilerPass {
      * break. However, if we remove the last break, the 2nd break becomes
      * useless and finally the first break becomes useless as well.
      *
-     * @returns The target of this jump. If the target is also useless jump,
+     * @return The target of this jump. If the target is also useless jump,
      *     the target of that useless jump recursively.
      */
     @SuppressWarnings("fallthrough")

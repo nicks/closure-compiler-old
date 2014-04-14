@@ -524,7 +524,7 @@ public class Compiler extends AbstractCompiler {
    * duplicate inputs.
    */
   void initInputsByIdMap() {
-    inputsById = new HashMap<InputId, CompilerInput>();
+    inputsById = new HashMap<>();
     for (CompilerInput input : externs) {
       InputId id = input.getInputId();
       CompilerInput previous = putCompilerInput(id, input);
@@ -656,11 +656,7 @@ public class Compiler extends AbstractCompiler {
         } else {
           result = future.get();
         }
-      } catch (InterruptedException e) {
-        throw Throwables.propagate(e);
-      } catch (ExecutionException e) {
-        throw Throwables.propagate(e);
-      } catch (TimeoutException e) {
+      } catch (InterruptedException | TimeoutException | ExecutionException e) {
         throw Throwables.propagate(e);
       }
     } else {
@@ -1292,6 +1288,7 @@ public class Compiler extends AbstractCompiler {
     }
 
     Tracer tracer = newTracer(PARSING_PASS_NAME);
+    beforePass(PARSING_PASS_NAME);
 
     try {
       // Parse externs sources.
@@ -1387,6 +1384,7 @@ public class Compiler extends AbstractCompiler {
       }
       return externAndJsRoot;
     } finally {
+      afterPass(PARSING_PASS_NAME);
       stopTracer(tracer, PARSING_PASS_NAME);
     }
   }
@@ -1526,7 +1524,7 @@ public class Compiler extends AbstractCompiler {
         }
         modules.add(0, root);
         SortedDependencies<JSModule> sorter =
-          new SortedDependencies<JSModule>(modules);
+          new SortedDependencies<>(modules);
         modules = sorter.getDependenciesOf(modules, true);
         this.modules = modules;
 
@@ -1956,7 +1954,7 @@ public class Compiler extends AbstractCompiler {
 
   protected final RecentChange recentChange = new RecentChange();
   private final List<CodeChangeHandler> codeChangeHandlers =
-      Lists.<CodeChangeHandler>newArrayList();
+      Lists.newArrayList();
 
   /** Name of the synthetic input that holds synthesized externs. */
   static final String SYNTHETIC_EXTERNS = "{SyntheticVarsDeclar}";
@@ -2098,7 +2096,8 @@ public class Compiler extends AbstractCompiler {
       isIdeMode(),
       mode,
       acceptConstKeyword(),
-      options.extraAnnotationNames);
+      options.extraAnnotationNames,
+      options.useNewParser);
   }
 
   @Override
@@ -2306,7 +2305,7 @@ public class Compiler extends AbstractCompiler {
 
   @Override
   List<CompilerInput> getInputsInOrder() {
-    return Collections.<CompilerInput>unmodifiableList(inputs);
+    return Collections.unmodifiableList(inputs);
   }
 
   /**
@@ -2320,7 +2319,7 @@ public class Compiler extends AbstractCompiler {
    * Gets the externs in the order in which they are being processed.
    */
   List<CompilerInput> getExternsInOrder() {
-    return Collections.<CompilerInput>unmodifiableList(externs);
+    return Collections.unmodifiableList(externs);
   }
 
   /**

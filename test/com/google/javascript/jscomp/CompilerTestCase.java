@@ -81,6 +81,9 @@ public abstract class CompilerTestCase extends TestCase  {
   /** Whether the expected JS strings should be normalized. */
   private boolean normalizeExpected = false;
 
+  /** Whether we run InferConsts before checking. */
+  private boolean enableInferConsts = false;
+
   /** Whether to check that all line number information is preserved. */
   private boolean checkLineNumbers = true;
 
@@ -238,6 +241,13 @@ public abstract class CompilerTestCase extends TestCase  {
    */
   protected void enableEcmaScript5(boolean acceptES5) {
     this.acceptES5 = acceptES5;
+  }
+
+  /**
+   * Whether to run InferConsts before passes
+   */
+  protected void enableInferConsts(boolean enable) {
+    this.enableInferConsts = enable;
   }
 
   /**
@@ -855,6 +865,10 @@ public abstract class CompilerTestCase extends TestCase  {
           normalizeActualCode(compiler, externsRoot, mainRoot);
         }
 
+        if (enableInferConsts && i == 0) {
+          new InferConsts(compiler).process(externsRoot, mainRoot);
+        }
+
         if (computeSideEffects && i == 0) {
           PureFunctionIdentifier.Driver mark =
               new PureFunctionIdentifier.Driver(compiler, null, false);
@@ -964,7 +978,7 @@ public abstract class CompilerTestCase extends TestCase  {
         String explanation = externsRootClone.checkTreeEquals(externsRoot);
         fail("Unexpected changes to externs" +
             "\nExpected: " + compiler.toSource(externsRootClone) +
-            "\nResult: " + compiler.toSource(externsRoot) +
+            "\nResult:   " + compiler.toSource(externsRoot) +
             "\n" + explanation);
       }
 
@@ -985,8 +999,9 @@ public abstract class CompilerTestCase extends TestCase  {
       if (expected != null) {
         if (compareAsTree) {
           String explanation = expectedRoot.checkTreeEquals(mainRoot);
-          assertNull("\nExpected: " + compiler.toSource(expectedRoot) +
-              "\nResult: " + compiler.toSource(mainRoot) +
+          assertNull(
+              "\nExpected: " + compiler.toSource(expectedRoot) +
+              "\nResult:   " + compiler.toSource(mainRoot) +
               "\n" + explanation, explanation);
         } else if (expected != null) {
           assertEquals(
@@ -1003,9 +1018,10 @@ public abstract class CompilerTestCase extends TestCase  {
           normalizeCheckExternsRootClone, normalizeCheckMainRootClone);
       String explanation =
           normalizeCheckMainRootClone.checkTreeEquals(mainRoot);
-      assertNull("Node structure normalization invalidated.\nExpected: " +
+      assertNull("Node structure normalization invalidated." +
+          "\nExpected: " +
           compiler.toSource(normalizeCheckMainRootClone) +
-          "\nResult: " + compiler.toSource(mainRoot) +
+          "\nResult:   " + compiler.toSource(mainRoot) +
           "\n" + explanation, explanation);
 
       // TODO(johnlenz): enable this for most test cases.
@@ -1017,9 +1033,10 @@ public abstract class CompilerTestCase extends TestCase  {
         new Normalize(compiler, true).process(
             normalizeCheckExternsRootClone, normalizeCheckMainRootClone);
         explanation =  normalizeCheckMainRootClone.checkTreeEquals(mainRoot);
-        assertNull("Normalization invalidated.\nExpected: " +
+        assertNull("Normalization invalidated." +
+            "\nExpected: " +
             compiler.toSource(normalizeCheckMainRootClone) +
-            "\nResult: " + compiler.toSource(mainRoot) +
+            "\nResult:   " + compiler.toSource(mainRoot) +
             "\n" + explanation, explanation);
       }
     } else {

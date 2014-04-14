@@ -575,7 +575,7 @@ public class NewParserTest extends BaseJSTypeTestCase {
 
   public void testJSDocAttachment19() {
     Node fn =
-        parse(
+        parseWarning(
             "function f() { " +
             "  /** @type {string} */" +
             "  return;" +
@@ -590,7 +590,7 @@ public class NewParserTest extends BaseJSTypeTestCase {
 
   public void testJSDocAttachment20() {
     Node fn =
-        parse(
+        parseWarning(
             "function f() { " +
             "  /** @type {string} */" +
             "  if (true) return;" +
@@ -624,13 +624,13 @@ public class NewParserTest extends BaseJSTypeTestCase {
   }
 
   public void testInlineJSDocAttachment3() {
-    parse(
+    parseWarning(
         "function f(/** @type {string} */ x) {}",
         "Bad type annotation. type not recognized due to syntax error");
   }
 
   public void testInlineJSDocAttachment4() {
-    parse(
+    parseWarning(
         "function f(/**\n" +
         " * @type {string}\n" +
         " */ x) {}",
@@ -661,21 +661,21 @@ public class NewParserTest extends BaseJSTypeTestCase {
   public void testIncorrectJSDocDoesNotAlterJSParsing1() throws Exception {
     assertNodeEquality(
         parse("var a = [1,2]"),
-        parse("/** @type Array.<number*/var a = [1,2]",
+        parseWarning("/** @type Array.<number*/var a = [1,2]",
             MISSING_GT_MESSAGE));
   }
 
   public void testIncorrectJSDocDoesNotAlterJSParsing2() throws Exception {
     assertNodeEquality(
         parse("var a = [1,2]"),
-        parse("/** @type {Array.<number}*/var a = [1,2]",
+        parseWarning("/** @type {Array.<number}*/var a = [1,2]",
             MISSING_GT_MESSAGE));
   }
 
   public void testIncorrectJSDocDoesNotAlterJSParsing3() throws Exception {
     assertNodeEquality(
         parse("C.prototype.say=function(nums) {alert(nums.join(','));};"),
-        parse("/** @param {Array.<number} nums */" +
+        parseWarning("/** @param {Array.<number} nums */" +
             "C.prototype.say=function(nums) {alert(nums.join(','));};",
             MISSING_GT_MESSAGE));
   }
@@ -697,24 +697,28 @@ public class NewParserTest extends BaseJSTypeTestCase {
   public void testIncorrectJSDocDoesNotAlterJSParsing6() throws Exception {
     assertNodeEquality(
         parse("C.prototype.say=function(nums) {alert(nums.join(','));};"),
-        parse("/** @param {bool!*%E$} */" +
+        parseWarning("/** @param {bool!*%E$} */" +
             "C.prototype.say=function(nums) {alert(nums.join(','));};",
             "Bad type annotation. expected closing }",
             "Bad type annotation. expecting a variable name in a @param tag"));
   }
 
   public void testIncorrectJSDocDoesNotAlterJSParsing7() throws Exception {
+    isIdeMode = true;
+
     assertNodeEquality(
         parse("C.prototype.say=function(nums) {alert(nums.join(','));};"),
-        parse("/** @see */" +
+        parseWarning("/** @see */" +
             "C.prototype.say=function(nums) {alert(nums.join(','));};",
               "@see tag missing description"));
   }
 
   public void testIncorrectJSDocDoesNotAlterJSParsing8() throws Exception {
+    isIdeMode = true;
+
     assertNodeEquality(
         parse("C.prototype.say=function(nums) {alert(nums.join(','));};"),
-        parse("/** @author */" +
+        parseWarning("/** @author */" +
             "C.prototype.say=function(nums) {alert(nums.join(','));};",
               "@author tag missing author"));
   }
@@ -722,7 +726,7 @@ public class NewParserTest extends BaseJSTypeTestCase {
   public void testIncorrectJSDocDoesNotAlterJSParsing9() throws Exception {
     assertNodeEquality(
         parse("C.prototype.say=function(nums) {alert(nums.join(','));};"),
-        parse("/** @someillegaltag */" +
+        parseWarning("/** @someillegaltag */" +
               "C.prototype.say=function(nums) {alert(nums.join(','));};",
               "illegal use of unknown JSDoc tag \"someillegaltag\";"
               + " ignoring it"));
@@ -766,6 +770,61 @@ public class NewParserTest extends BaseJSTypeTestCase {
     }
   }
 
+  public void testAutomaticSemicolonInsertion() {
+    // var statements
+    assertNodeEquality(
+        parse("var x = 1\nvar y = 2"),
+        parse("var x = 1; var y = 2;"));
+    assertNodeEquality(
+        parse("var x = 1\n, y = 2"),
+        parse("var x = 1, y = 2;"));
+
+    // assign statements
+    assertNodeEquality(
+        parse("x = 1\ny = 2"),
+        parse("x = 1; y = 2;"));
+
+    // This fails because an EMPTY statement
+    // is inserted after the 'x=1'.
+    // TODO(tbreisacher): Fix and re-enable.
+    //assertNodeEquality(
+    //    parse("x = 1\n;y = 2"),
+    //    parse("x = 1; y = 2;"));
+
+    // if/else statements
+    assertNodeEquality(
+        parse("if (x)\n;else{}"),
+        parse("if (x) {} else {}"));
+  }
+
+  /**
+   * Test all the ASI examples from
+   * http://www.ecma-international.org/ecma-262/5.1/#sec-7.9.2
+   */
+  public void testAutomaticSemicolonInsertionExamplesFromSpec() {
+    parseError("{ 1 2 } 3", "Semi-colon expected");
+
+    assertNodeEquality(
+        parse("{ 1\n2 } 3"),
+        parse("{ 1; 2; } 3;"));
+
+    parseError("for (a; b\n)", "';' expected");
+
+    assertNodeEquality(
+        parse("return\na + b"),
+        parse("return; a + b;"));
+
+    assertNodeEquality(
+        parse("a = b\n++c"),
+        parse("a = b; ++c;"));
+
+    parseError("if (a > b)\nelse c = d", "primary expression expected");
+
+    assertNodeEquality(
+        parse("a = b + c\n(d + e).print()"),
+        parse("a = b + c(d + e).print()"));
+  }
+
   private Node createScript(Node n) {
     Node script = new Node(Token.SCRIPT);
     script.addChildToBack(n);
@@ -781,13 +840,13 @@ public class NewParserTest extends BaseJSTypeTestCase {
   }
 
   public void testTrailingCommaWarning3() {
-    parse("var a = ['foo', 'bar',];", TRAILING_COMMA_MESSAGE);
+    parseWarning("var a = ['foo', 'bar',];", TRAILING_COMMA_MESSAGE);
     mode = LanguageMode.ECMASCRIPT5;
     parse("var a = ['foo', 'bar',];");
   }
 
   public void testTrailingCommaWarning4() {
-    parse("var a = [,];", TRAILING_COMMA_MESSAGE);
+    parseWarning("var a = [,];", TRAILING_COMMA_MESSAGE);
     mode = LanguageMode.ECMASCRIPT5;
     parse("var a = [,];");
   }
@@ -797,7 +856,7 @@ public class NewParserTest extends BaseJSTypeTestCase {
   }
 
   public void testTrailingCommaWarning6() {
-    parse("var a = {'foo': 'bar',};", TRAILING_COMMA_MESSAGE);
+    parseWarning("var a = {'foo': 'bar',};", TRAILING_COMMA_MESSAGE);
     mode = LanguageMode.ECMASCRIPT5;
     parse("var a = {'foo': 'bar',};");
   }
@@ -808,19 +867,21 @@ public class NewParserTest extends BaseJSTypeTestCase {
   }
 
   public void testSuspiciousBlockCommentWarning1() {
-    parse("/* @type {number} */ var x = 3;", SUSPICIOUS_COMMENT_WARNING);
+    parseWarning("/* @type {number} */ var x = 3;", SUSPICIOUS_COMMENT_WARNING);
   }
 
   public void testSuspiciousBlockCommentWarning2() {
-    parse("/* \n * @type {number} */ var x = 3;", SUSPICIOUS_COMMENT_WARNING);
+    parseWarning("/* \n * @type {number} */ var x = 3;",
+        SUSPICIOUS_COMMENT_WARNING);
   }
 
   public void testSuspiciousBlockCommentWarning3() {
-    parse("/* \n *@type {number} */ var x = 3;", SUSPICIOUS_COMMENT_WARNING);
+    parseWarning("/* \n *@type {number} */ var x = 3;",
+        SUSPICIOUS_COMMENT_WARNING);
   }
 
   public void testSuspiciousBlockCommentWarning4() {
-    parse(
+    parseWarning(
         "  /*\n" +
         "   * @type {number}\n" +
         "   */\n" +
@@ -829,7 +890,7 @@ public class NewParserTest extends BaseJSTypeTestCase {
   }
 
   public void testSuspiciousBlockCommentWarning5() {
-    parse(
+    parseWarning(
         "  /*\n" +
         "   * some random text here\n" +
         "   * @type {number}\n" +
@@ -839,7 +900,7 @@ public class NewParserTest extends BaseJSTypeTestCase {
   }
 
   public void testSuspiciousBlockCommentWarning6() {
-    parse("/* @type{number} */ var x = 3;", SUSPICIOUS_COMMENT_WARNING);
+    parseWarning("/* @type{number} */ var x = 3;", SUSPICIOUS_COMMENT_WARNING);
   }
 
   public void testSuspiciousBlockCommentWarning7() {
@@ -858,7 +919,7 @@ public class NewParserTest extends BaseJSTypeTestCase {
   }
 
   public void testConstForbidden() {
-    parse("const x = 3;",
+    parseWarning("const x = 3;",
         "this language feature is only supported in es6 mode: " +
         "const declarations");
   }
@@ -884,13 +945,13 @@ public class NewParserTest extends BaseJSTypeTestCase {
   }
 
   public void testLetForbidden1() {
-    parse("let x = 3;",
+    parseWarning("let x = 3;",
         "this language feature is only supported in es6 mode: " +
         "let declarations");
   }
 
   public void testLetForbidden2() {
-    parse("function f() { let x = 3; };",
+    parseWarning("function f() { let x = 3; };",
         "this language feature is only supported in es6 mode: " +
         "let declarations");
   }
@@ -911,7 +972,7 @@ public class NewParserTest extends BaseJSTypeTestCase {
   }
 
   public void testGenerator() {
-    parse("function* f() { yield 3; }",
+    parseWarning("function* f() { yield 3; }",
         "this language feature is only supported in es6 mode: generators");
   }
 
@@ -967,6 +1028,8 @@ public class NewParserTest extends BaseJSTypeTestCase {
   }
 
   public void testFileOverviewJSDoc1() {
+    isIdeMode = true;
+
     Node n = parse("/** @fileoverview Hi mom! */ function Foo() {}");
     assertEquals(Token.FUNCTION, n.getFirstChild().getType());
     assertTrue(n.getJSDocInfo() != null);
@@ -995,6 +1058,8 @@ public class NewParserTest extends BaseJSTypeTestCase {
   }
 
   public void testFileOverviewJSDoc2() {
+    isIdeMode = true;
+
     Node n = parse("/** @fileoverview Hi mom! */ " +
         "/** @constructor */ function Foo() {}");
     assertTrue(n.getJSDocInfo() != null);
@@ -1016,7 +1081,7 @@ public class NewParserTest extends BaseJSTypeTestCase {
   }
 
   public void testDuplicatedParam() {
-    parse("function foo(x, x) {}", "Duplicate parameter name \"x\".");
+    parseWarning("function foo(x, x) {}", "Duplicate parameter name \"x\".");
   }
 
   public void testLet() {
@@ -1077,7 +1142,7 @@ public class NewParserTest extends BaseJSTypeTestCase {
 
   public void testStringContinuations() {
     mode = LanguageMode.ECMASCRIPT3;
-    parse("'\\\n';",
+    parseWarning("'\\\n';",
         "String continuations are not supported in this language mode.");
     mode = LanguageMode.ECMASCRIPT5;
     parse("'\\\n';");
@@ -1087,10 +1152,10 @@ public class NewParserTest extends BaseJSTypeTestCase {
 
   public void testBinaryLiterals() {
     mode = LanguageMode.ECMASCRIPT3;
-    parse("0b0001;",
+    parseWarning("0b0001;",
         "Binary integer literals are not supported in this language mode.");
     mode = LanguageMode.ECMASCRIPT5;
-    parse("0b0001;",
+    parseWarning("0b0001;",
         "Binary integer literals are not supported in this language mode.");
     mode = LanguageMode.ECMASCRIPT6;
     parse("0b0001;");
@@ -1098,10 +1163,10 @@ public class NewParserTest extends BaseJSTypeTestCase {
 
   public void testOctalLiterals() {
     mode = LanguageMode.ECMASCRIPT3;
-    parse("0o0001;",
+    parseWarning("0o0001;",
         "Octal integer literals are not supported in this language mode.");
     mode = LanguageMode.ECMASCRIPT5;
-    parse("0o0001;",
+    parseWarning("0o0001;",
         "Octal integer literals are not supported in this language mode.");
     mode = LanguageMode.ECMASCRIPT6;
     parse("0o0001;");
@@ -1169,6 +1234,8 @@ public class NewParserTest extends BaseJSTypeTestCase {
   }
 
   public void testParseBlockDescription() {
+    isIdeMode = true;
+
     Node n = parse("/** This is a variable. */ var x;");
     Node var = n.getFirstChild();
     assertNotNull(var.getJSDocInfo());
@@ -1222,8 +1289,8 @@ public class NewParserTest extends BaseJSTypeTestCase {
   public void testKeywordsAsProperties() {
     mode = LanguageMode.ECMASCRIPT3;
 
-    // parse("var x = {function: 1};", IRFactory.INVALID_ES3_PROP_NAME);
-    parse("x.function;", IRFactory.INVALID_ES3_PROP_NAME);
+    // parseWarning("var x = {function: 1};", IRFactory.INVALID_ES3_PROP_NAME);
+    parseWarning("x.function;", IRFactory.INVALID_ES3_PROP_NAME);
     parseError("var x = {get x(){} };",
         IRFactory.GETTER_ERROR_MESSAGE);
     parseError("var x = {get function(){} };", IRFactory.GETTER_ERROR_MESSAGE);
@@ -1236,14 +1303,17 @@ public class NewParserTest extends BaseJSTypeTestCase {
         IRFactory.SETTER_ERROR_MESSAGE);
     parseError("var x = {set 1(a){} };",
         IRFactory.SETTER_ERROR_MESSAGE);
-    parse("var x = {class: 1};", IRFactory.INVALID_ES3_PROP_NAME);
+    parseWarning("var x = {class: 1};", IRFactory.INVALID_ES3_PROP_NAME);
     parse("var x = {'class': 1};");
-    parse("x.class;", IRFactory.INVALID_ES3_PROP_NAME);
+    parseWarning("x.class;", IRFactory.INVALID_ES3_PROP_NAME);
     parse("x['class'];");
     parse("var x = {let: 1};");  // 'let' is not reserved in ES3
     parse("x.let;");
     parse("var x = {yield: 1};"); // 'yield' is not reserved in ES3
     parse("x.yield;");
+    parseWarning("x.prototype.catch = function() {};",
+        IRFactory.INVALID_ES3_PROP_NAME);
+    parseWarning("x().catch();", IRFactory.INVALID_ES3_PROP_NAME);
 
     mode = LanguageMode.ECMASCRIPT5;
 
@@ -1261,6 +1331,8 @@ public class NewParserTest extends BaseJSTypeTestCase {
     parse("x.let;");
     parse("var x = {yield: 1};");
     parse("x.yield;");
+    parse("x.prototype.catch = function() {};");
+    parse("x().catch();");
 
     mode = LanguageMode.ECMASCRIPT5_STRICT;
 
@@ -1278,6 +1350,55 @@ public class NewParserTest extends BaseJSTypeTestCase {
     parse("x.let;");
     parse("var x = {yield: 1};");
     parse("x.yield;");
+    parse("x.prototype.catch = function() {};");
+    parse("x().catch();");
+  }
+
+  public void testUnicodeInIdentifiers() {
+    parse("var \\u00fb");
+    parse("Js\\u00C7ompiler");
+    parse("Js\\u0043ompiler");
+  }
+
+  public void testInvalidEscape() {
+    parseError("var \\x39abc", "Invalid escape sequence '\\x'");
+    parseError("var abc\\t", "Invalid escape sequence '\\t'");
+  }
+
+  public void testEOFInUnicodeEscape() {
+    parseError("var \\u1", "Hex digit expected");
+    parseError("var \\u12", "Hex digit expected");
+    parseError("var \\u123", "Hex digit expected");
+  }
+
+  public void testEndOfIdentifierInUnicodeEscape() {
+    parseError("var \\u1 = 1;", "Hex digit expected");
+    parseError("var \\u12 = 2;", "Hex digit expected");
+    parseError("var \\u123 = 3;", "Hex digit expected");
+  }
+
+  public void testInvalidUnicodeEscape() {
+    parseError("var \\uDEFG", "Hex digit expected");
+  }
+
+  public void testUnicodeEscapeInvalidIdentifierStart() {
+    parseError("var \\u0020space",
+        "Character ' ' (U+0020) is not a valid identifier start char");
+  }
+
+  public void testUnicodeEscapeInvalidIdentifierChar() {
+    // TODO(tbreisacher): This error could be clearer.
+    parseError("var sp\\u0020ce",
+        "Character ' ' (U+0020) is not a valid identifier start char");
+  }
+
+  /**
+   * It is illegal to use a keyword as an identifier, even if you use
+   * unicode escapes to obscure the fact that you are trying do that.
+   */
+  public void testKeywordAsIdentifier() {
+    parseError("var while;", "'identifier' expected");
+    parseError("var wh\\u0069le;", "'identifier' expected");
   }
 
   public void testGetPropFunctionName() {
@@ -1325,7 +1446,7 @@ public class NewParserTest extends BaseJSTypeTestCase {
 
   public void testMisplacedTypeAnnotation1() {
     // misuse with COMMA
-    parse(
+    parseWarning(
         "var o = {};" +
         "/** @type {string} */ o.prop1 = 1, o.prop2 = 2;",
         MISPLACED_TYPE_ANNOTATION);
@@ -1333,34 +1454,34 @@ public class NewParserTest extends BaseJSTypeTestCase {
 
   public void testMisplacedTypeAnnotation2() {
     // missing parentheses for the cast.
-    parse(
+    parseWarning(
         "var o = /** @type {string} */ getValue();",
         MISPLACED_TYPE_ANNOTATION);
   }
 
   public void testMisplacedTypeAnnotation3() {
     // missing parentheses for the cast.
-    parse(
+    parseWarning(
         "var o = 1 + /** @type {string} */ value;",
         MISPLACED_TYPE_ANNOTATION);
   }
 
   public void testMisplacedTypeAnnotation4() {
     // missing parentheses for the cast.
-    parse(
+    parseWarning(
         "var o = /** @type {!Array.<string>} */ ['hello', 'you'];",
         MISPLACED_TYPE_ANNOTATION);
   }
 
   public void testMisplacedTypeAnnotation5() {
     // missing parentheses for the cast.
-    parse(
+    parseWarning(
         "var o = (/** @type {!Foo} */ {});",
         MISPLACED_TYPE_ANNOTATION);
   }
 
   public void testMisplacedTypeAnnotation6() {
-    parse("var o = /** @type {function():string} */ function() {return 'str';}",
+    parseWarning("var o = /** @type {function():string} */ function() {return 'str';}",
         MISPLACED_TYPE_ANNOTATION);
   }
 
@@ -1414,11 +1535,11 @@ public class NewParserTest extends BaseJSTypeTestCase {
     parse("class C {}");
 
     mode = LanguageMode.ECMASCRIPT5;
-    parse("class C {}",
+    parseWarning("class C {}",
         "this language feature is only supported in es6 mode: class");
 
     mode = LanguageMode.ECMASCRIPT3;
-    parse("class C {}",
+    parseWarning("class C {}",
         "this language feature is only supported in es6 mode: class");
 
   }
@@ -1449,11 +1570,11 @@ public class NewParserTest extends BaseJSTypeTestCase {
     parse("function f() {super;};");
 
     mode = LanguageMode.ECMASCRIPT5;
-    parse("super;",
+    parseWarning("super;",
         "this language feature is only supported in es6 mode: super");
 
     mode = LanguageMode.ECMASCRIPT3;
-    parse("super;",
+    parseWarning("super;",
         "this language feature is only supported in es6 mode: super");
   }
 
@@ -1468,12 +1589,12 @@ public class NewParserTest extends BaseJSTypeTestCase {
     parse("a => b");
 
     mode = LanguageMode.ECMASCRIPT5;
-    parse("a => b",
+    parseWarning("a => b",
         "this language feature is only supported in es6 mode: " +
         "short function syntax");
 
     mode = LanguageMode.ECMASCRIPT3;
-    parse("a => b;",
+    parseWarning("a => b;",
         "this language feature is only supported in es6 mode: " +
         "short function syntax");
   }
@@ -1566,23 +1687,12 @@ public class NewParserTest extends BaseJSTypeTestCase {
     return script;
   }
 
-  private Node parse(String string, String... warnings) {
-    TestErrorReporter testErrorReporter = new TestErrorReporter(null, warnings);
-    Node script = null;
-    try {
-      StaticSourceFile file = new SimpleSourceFile("input", false);
-      script = ParserRunner.parseEs6(
-          file, string, ParserRunner.createConfig(true, mode, false),
-          testErrorReporter, Logger.getAnonymousLogger()).ast;
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-
-    // verifying that all warnings were seen
-    assertTrue(testErrorReporter.hasEncounteredAllErrors());
-    assertTrue(testErrorReporter.hasEncounteredAllWarnings());
-
-    return script;
+  /**
+   * Verify that the given code has no parse warnings or errors.
+   * @return The parse tree.
+   */
+  private Node parse(String string) {
+    return parseWarning(string);
   }
 
   private static class ParserResult {

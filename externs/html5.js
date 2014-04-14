@@ -3073,7 +3073,7 @@ MutationRecord.prototype.oldValue;
 
 /**
  * @see http://www.w3.org/TR/domcore/#mutation-observers
- * @param {function(Array.<MutationRecord>)} callback
+ * @param {function(Array.<MutationRecord>, MutationObserver)} callback
  * @constructor
  */
 function MutationObserver(callback) {}
@@ -3162,6 +3162,12 @@ Document.prototype.registerElement;
 Document.prototype.register;
 
 /**
+ * @type {!FontFaceSet}
+ * @see http://dev.w3.org/csswg/css-font-loading/#dom-fontfacesource-fonts
+ */
+Document.prototype.fonts;
+
+/**
  * @see https://github.com/promises-aplus/promises-spec
  * @typedef {{then: !Function}}
  */
@@ -3199,6 +3205,21 @@ IThenable.prototype.then = function(opt_onFulfilled, opt_onRejected) {};
  * @template TYPE
  */
 var Promise = function(resolver) {};
+
+
+/**
+ * @param {(TYPE|IThenable.<TYPE>)=} opt_value
+ * @return {!Promise.<TYPE>}
+ * @template TYPE
+ */
+Promise.resolve = function(opt_value) {};
+
+
+/**
+ * @param {*=} opt_error
+ * @return {!Promise}
+ */
+Promise.reject = function(opt_error) {};
 
 
 /** @override */

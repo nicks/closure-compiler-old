@@ -355,7 +355,7 @@ class NewIRFactory {
     }
   }
 
-  private boolean isBreakTarget(Node n) {
+  private static boolean isBreakTarget(Node n) {
     switch (n.getType()) {
       case Token.FOR:
       case Token.WHILE:
@@ -366,7 +366,7 @@ class NewIRFactory {
     return false;
   }
 
-  private boolean isContinueTarget(Node n) {
+  private static boolean isContinueTarget(Node n) {
     switch (n.getType()) {
       case Token.FOR:
       case Token.WHILE:
@@ -377,7 +377,7 @@ class NewIRFactory {
   }
 
 
-  private boolean labelsMatch(Node label, Node labelName) {
+  private static boolean labelsMatch(Node label, Node labelName) {
     return label.getFirstChild().getString().equals(labelName.getString());
   }
 
@@ -597,7 +597,7 @@ class NewIRFactory {
     }
   }
 
-  private ParseTree findNearestNode(ParseTree tree) {
+  private static ParseTree findNearestNode(ParseTree tree) {
     switch (tree.type) {
       case EXPRESSION_STATEMENT:
         return findNearestNode(tree.asExpressionStatement().expression);
@@ -625,7 +625,7 @@ class NewIRFactory {
     return n.isFunction() && isStmtContainer(n.getParent());
   }
 
-  private boolean isStmtContainer(Node n) {
+  private static boolean isStmtContainer(Node n) {
     return n.isBlock() || n.isScript();
   }
 
@@ -640,7 +640,7 @@ class NewIRFactory {
     return node;
   }
 
-  private void attachJSDoc(JSDocInfo info, Node n) {
+  private static void attachJSDoc(JSDocInfo info, Node n) {
     info.setAssociatedNode(n);
     n.setJSDocInfo(info);
   }
@@ -726,12 +726,12 @@ class NewIRFactory {
     return charno(node.location.start);
   }
 
-  private int lineno(SourcePosition location) {
+  private static int lineno(SourcePosition location) {
     // location lines start at zero, our AST starts at 1.
     return location.line + 1;
   }
 
-  private int charno(SourcePosition location) {
+  private static int charno(SourcePosition location) {
     return location.column;
   }
 
@@ -1484,8 +1484,7 @@ class NewIRFactory {
         int end = token.location.end.offset;
         if (start < sourceString.length() &&
             (sourceString.substring(
-                 start, Math.min(sourceString.length(), end))
-             .indexOf("\\v") != -1)) {
+                start, Math.min(sourceString.length(), end)).contains("\\v"))) {
           n.putBooleanProp(Node.SLASH_V, true);
         }
       }
@@ -1668,7 +1667,16 @@ class NewIRFactory {
           if (!config.acceptConstKeyword) {
             maybeWarnEs6Feature(decl, "const declarations");
           }
-          declType = Token.CONST;
+
+          if (isEs6Mode()) {
+            declType = Token.CONST;
+          } else {
+            // Code uses the 'const' keyword which is non-standard in ES5 and
+            // below. Just treat it as though it was a 'var'.
+            // TODO(tbreisacher): Treat this node as though it had an @const
+            // annotation.
+            declType = Token.VAR;
+          }
           break;
         case LET:
           maybeWarnEs6Feature(decl, "let declarations");
@@ -2014,6 +2022,21 @@ class NewIRFactory {
           }
 
           break;
+        case '1': case '2': case '3': case '4': case '5': case '6': case '7':
+          if (inStrictContext()) {
+            errorReporter.warning(OCTAL_STRING_LITERAL_WARNING,
+                sourceName,
+                lineno(token.location.start), "", charno(token.location.start));
+          }
+          char next = value.charAt(cur + 1);
+          if (isOctalDigit(next)) {
+            result.append((char) (8 * octaldigit(c) + octaldigit(next)));
+            cur += 1;
+          } else {
+            result.append((char) octaldigit(c));
+          }
+
+          break;
         case 'x':
           result.append((char) (
               hexdigit(value.charAt(cur + 1)) * 16
@@ -2029,6 +2052,8 @@ class NewIRFactory {
           cur += 4;
           break;
         default:
+          // TODO(tbreisacher): Add a warning because the user probably
+          // intended to type an escape sequence.
           result.append(c);
           break;
       }

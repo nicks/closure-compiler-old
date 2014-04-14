@@ -55,8 +55,6 @@ public class ParserRunner {
   private static Set<String> suppressionNames = null;
   private static Set<String> reservedVars = null;
 
-  private static boolean useExperimentalParser = false;
-
   // Should never need to instantiate class of static methods.
   private ParserRunner() {}
 
@@ -78,17 +76,17 @@ public class ParserRunner {
                                     LanguageMode languageMode,
                                     boolean acceptConstKeyword,
                                     Set<String> extraAnnotationNames,
-                                    boolean useExperimentalParser) {
+                                    boolean useNewParser) {
     initResourceConfig();
     Set<String> effectiveAnnotationNames;
     if (extraAnnotationNames == null) {
       effectiveAnnotationNames = annotationNames;
     } else {
-      effectiveAnnotationNames = new HashSet<String>(annotationNames);
+      effectiveAnnotationNames = new HashSet<>(annotationNames);
       effectiveAnnotationNames.addAll(extraAnnotationNames);
     }
     return new Config(effectiveAnnotationNames, suppressionNames,
-        isIdeMode, languageMode, acceptConstKeyword, useExperimentalParser);
+        isIdeMode, languageMode, acceptConstKeyword, useNewParser);
   }
 
   public static Set<String> getReservedVars() {
@@ -139,7 +137,7 @@ public class ParserRunner {
   }
 
   private static boolean useExperimentalParser(Config config) {
-    return useExperimentalParser
+    return config.useExperimentalParser
         || config.languageMode == LanguageMode.ECMASCRIPT6
         || config.languageMode == LanguageMode.ECMASCRIPT6_STRICT;
   }

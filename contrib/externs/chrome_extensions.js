@@ -233,6 +233,20 @@ chrome.app.runtime.onRestarted;
 chrome.app.window = {};
 
 
+/**
+ * @see https://developer.chrome.com/apps/app_window#method-getAll
+ * @return {!Array.<!chrome.app.window.AppWindow>}
+ */
+chrome.app.window.getAll = function() {};
+
+
+/**
+ * @see https://developer.chrome.com/apps/app_window#method-get
+ * @param {string} id
+ * @return {chrome.app.window.AppWindow}
+ */
+chrome.app.window.get = function(id) {};
+
 
 /**
  * @constructor
@@ -1415,7 +1429,6 @@ chrome.bookmarks = {};
  *     optionally 'index', 'title', and 'url'.
  * @param {function(BookmarkTreeNode): void=} opt_callback The
  *     callback function which accepts a BookmarkTreeNode object.
- * @return {BookmarkTreeNode}
  */
 chrome.bookmarks.create = function(bookmark, opt_callback) {};
 
@@ -1466,12 +1479,10 @@ chrome.bookmarks.getTree = function(callback) {};
 
 /**
  * @param {string} id
- * @param {Object} destination An object which has 'parentId' and
- *     optionally 'index'.
- * @param {function(Array.<BookmarkTreeNode>): void=} opt_callback
- *     The callback function which accepts an array of
- *     BookmarkTreeNode.
- * @return {BookmarkTreeNode}
+ * @param {Object} destination An object which has optional 'parentId' and
+ *     optional 'index'.
+ * @param {function(BookmarkTreeNode): void=} opt_callback
+ *     The callback function which accepts a BookmarkTreeNode object.
  */
 chrome.bookmarks.move = function(id, destination, opt_callback) {};
 
@@ -1503,7 +1514,6 @@ chrome.bookmarks.search = function(query, callback) {};
  * @param {Object} changes An object which may have 'title' as a key.
  * @param {function(BookmarkTreeNode): void=} opt_callback The
  *     callback function which accepts a BookmarkTreeNode object.
- * @return {BookmarkTreeNode}
  */
 chrome.bookmarks.update = function(id, changes, opt_callback) {};
 
@@ -4949,6 +4959,34 @@ chrome.usb.ConnectionHandle.prototype.productId;
 
 /**
  * @typedef {{
+ *   address: number,
+ *   type: string,
+ *   direction: string,
+ *   maximumPacketSize: number,
+ *   synchronization: (string|undefined),
+ *   usage: (string|undefined),
+ *   pollingInterval: (number|undefined)
+ * }}
+ */
+chrome.usb.InterfaceEndpoint;
+
+
+/**
+ * @typedef {{
+ *   interfaceNumber: number,
+ *   alternateSetting: number,
+ *   interfaceClass: number,
+ *   interfaceSubclass: number,
+ *   interfaceProtocol: number,
+ *   description: (string|undefined),
+ *   endpoints: !Array.<!chrome.usb.InterfaceEndpoint>
+ * }}
+ */
+chrome.usb.InterfaceDescriptor;
+
+
+/**
+ * @typedef {{
  *   direction: string,
  *   endpoint: number,
  *   length: (number|undefined),
@@ -5033,8 +5071,8 @@ chrome.usb.closeDevice = function(handle, callback) {};
  * @see http://developer.chrome.com/apps/usb.html#method-listInterfaces
  * @param {!chrome.usb.ConnectionHandle} handle The device from which the
  *     interfaces should be listed.
- * @param {function(!Array.<!Object>)} callback The callback to invoke when the
- *     interfaces are enumerated.
+ * @param {function(!Array.<!chrome.usb.InterfaceDescriptor>)} callback
+ *     The callback to invoke when the interfaces are enumerated.
  */
 chrome.usb.listInterfaces = function(handle, callback) {};
 

@@ -71,7 +71,7 @@ public class JSType {
     if (objs == null) {
       this.mask = mask;
       this.objs = null;
-    } else if (objs.size() == 0) {
+    } else if (objs.isEmpty()) {
       this.mask = mask & ~NON_SCALAR_MASK;
       this.objs = null;
     } else {
@@ -79,8 +79,9 @@ public class JSType {
       this.objs = objs;
     }
     Preconditions.checkState(this.isValidType(),
-        "Cannot create type with bits <<<" + Integer.toHexString(mask) +
-        ">>>, objs <<<" + objs + ">>>, and typeVar <<<" + typeVar + ">>>");
+        "Cannot create type with bits <<<%s>>>, " +
+        "objs <<<%s>>>, and typeVar <<<%s>>>",
+        Integer.toHexString(mask), objs, typeVar);
   }
 
   private JSType(int mask) {
@@ -129,6 +130,8 @@ public class JSType {
   public static final JSType UNKNOWN = new JSType(UNKNOWN_MASK);
 
   public static final JSType TOP_OBJECT = fromObjectType(ObjectType.TOP_OBJECT);
+  public static final JSType TOP_STRUCT = fromObjectType(ObjectType.TOP_STRUCT);
+  public static final JSType TOP_DICT = fromObjectType(ObjectType.TOP_DICT);
   private static JSType TOP_FUNCTION = null;
 
   // Some commonly used types
@@ -201,7 +204,7 @@ public class JSType {
     } else if (objs == null) {
       return true;
     }
-    for (ObjectType obj: objs) {
+    for (ObjectType obj : objs) {
       if (!obj.isInhabitable()) {
         return false;
       }
@@ -219,6 +222,46 @@ public class JSType {
 
   boolean isTypeVariable() {
     return (mask & ~TYPEVAR_MASK) == 0;
+  }
+
+  public boolean isStruct() {
+    if (objs == null) {
+      return false;
+    }
+    for (ObjectType objType : objs) {
+      if (objType.isStruct()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  public boolean isLooseStruct() {
+    if (objs == null) {
+      return false;
+    }
+    boolean foundLooseStruct = false;
+    boolean foundNonLooseStruct = false;
+    for (ObjectType objType : objs) {
+      if (objType.isLooseStruct()) {
+        foundLooseStruct = true;
+      } else if (objType.isStruct()) {
+        foundNonLooseStruct = true;
+      }
+    }
+    return foundLooseStruct && !foundNonLooseStruct;
+  }
+
+  public boolean isDict() {
+    if (objs == null) {
+      return false;
+    }
+    for (ObjectType objType : objs) {
+      if (objType.isDict()) {
+        return true;
+      }
+    }
+    return false;
   }
 
   public static boolean areCompatibleScalarTypes(JSType lhs, JSType rhs) {
@@ -284,7 +327,7 @@ public class JSType {
         type = unified;
       }
     }
-    for (JSType typeToRemove: typesToRemove) {
+    for (JSType typeToRemove : typesToRemove) {
       typeMultimap.remove(typeParam, typeToRemove);
     }
     typeMultimap.put(typeParam, type);
@@ -302,7 +345,7 @@ public class JSType {
    * the type variables of interest in {@code t1} and {@code t2}, treating
    * JSType.UNKNOWN as a "hole" to be filled.
    * @return The unified type, or null if unification fails */
-  public static JSType unifyUnknowns(JSType t1, JSType t2) {
+  static JSType unifyUnknowns(JSType t1, JSType t2) {
     if (t1.isUnknown()) {
       return t2;
     } else if (t2.isUnknown()) {
@@ -524,7 +567,16 @@ public class JSType {
     return BOOLEAN;
   }
 
+  public boolean isNonLooseSubtypeOf(JSType other) {
+    return isSubtypeOfHelper(false, other);
+  }
+
   public boolean isSubtypeOf(JSType other) {
+    return isSubtypeOfHelper(true, other);
+  }
+
+  private boolean isSubtypeOfHelper(
+      boolean keepLoosenessOfThis, JSType other) {
     if (isUnknown() || other.isUnknown() || other.isTop()) {
       return true;
     } else if ((mask | other.mask) != other.mask) {
@@ -536,7 +588,7 @@ public class JSType {
     }
     // Because of optional properties,
     //   x \le y \iff x \join y = y does not hold.
-    return ObjectType.isUnionSubtype(this.objs, other.objs);
+    return ObjectType.isUnionSubtype(keepLoosenessOfThis, this.objs, other.objs);
   }
 
   public JSType removeType(JSType other) {
@@ -557,7 +609,7 @@ public class JSType {
     NominalType otherKlass =
         Iterables.getOnlyElement(other.objs).getNominalType();
     ImmutableSet.Builder<ObjectType> newObjs = ImmutableSet.builder();
-    for (ObjectType obj: objs) {
+    for (ObjectType obj : objs) {
       if (!Objects.equal(obj.getNominalType(), otherKlass)) {
         newObjs.add(obj);
       }
@@ -588,7 +640,7 @@ public class JSType {
       return Iterables.getOnlyElement(objs).getFunType();
     }
     FunctionType result = FunctionType.TOP_FUNCTION;
-    for (ObjectType obj: objs) {
+    for (ObjectType obj : objs) {
       result = FunctionType.meet(result, obj.getFunType());
     }
     return result;
@@ -617,7 +669,7 @@ public class JSType {
         ObjectType.withLooseObjects(this.objs), typeVar);
   }
 
-  public JSType getProp(String qname) {
+  public JSType getProp(QualifiedName qname) {
     if (isBottom() || isUnknown()) {
       return UNKNOWN;
     }
@@ -634,7 +686,7 @@ public class JSType {
     return ptype;
   }
 
-  public boolean mayHaveProp(String qname) {
+  public boolean mayHaveProp(QualifiedName qname) {
     if (objs == null) {
       return false;
     }
@@ -646,7 +698,7 @@ public class JSType {
     return false;
   }
 
-  public boolean hasProp(String qname) {
+  public boolean hasProp(QualifiedName qname) {
     if (objs == null) {
       return false;
     }
@@ -658,12 +710,12 @@ public class JSType {
     return true;
   }
 
-  public boolean hasInferredProp(String pname) {
-    Preconditions.checkState(TypeUtils.isIdentifier(pname));
+  public boolean hasInferredProp(QualifiedName pname) {
+    Preconditions.checkState(pname.isIdentifier());
     return hasProp(pname) && getDeclaredProp(pname) == null;
   }
 
-  public JSType getDeclaredProp(String qname) {
+  public JSType getDeclaredProp(QualifiedName qname) {
     if (isUnknown()) {
       return UNKNOWN;
     }
@@ -678,14 +730,14 @@ public class JSType {
     return ptype.isBottom() ? null : ptype;
   }
 
-  public JSType withoutProperty(String qname) {
+  public JSType withoutProperty(QualifiedName qname) {
     return this.objs == null ?
         this :
         new JSType(this.mask, this.location,
             ObjectType.withoutProperty(this.objs, qname), typeVar);
   }
 
-  public JSType withProperty(String qname, JSType type) {
+  public JSType withProperty(QualifiedName qname, JSType type) {
     if (isUnknown()) {
       return this;
     }
@@ -694,17 +746,17 @@ public class JSType {
         ObjectType.withProperty(this.objs, qname, type), typeVar);
   }
 
-  public JSType withDeclaredProperty(String qname, JSType type) {
+  public JSType withDeclaredProperty(QualifiedName qname, JSType type) {
     Preconditions.checkState(this.objs != null && this.location == null);
     return new JSType(this.mask, null,
         ObjectType.withDeclaredProperty(this.objs, qname, type), typeVar);
   }
 
-  public JSType withPropertyRequired(String qname) {
+  public JSType withPropertyRequired(String pname) {
     return (isUnknown() || this.objs == null) ?
         this :
         new JSType(this.mask, this.location,
-            ObjectType.withPropertyRequired(this.objs, qname), typeVar);
+            ObjectType.withPropertyRequired(this.objs, pname), typeVar);
   }
 
   static List<JSType> fixLengthOfTypeList(
@@ -713,7 +765,7 @@ public class JSType {
     if (length == desiredLength) {
       return typeList;
     }
-    ImmutableList.Builder builder = ImmutableList.builder();
+    ImmutableList.Builder<JSType> builder = ImmutableList.builder();
     for (int i = 0; i < desiredLength; i++) {
       builder.add(i < length ? typeList.get(i) : UNKNOWN);
     }
@@ -788,7 +840,7 @@ public class JSType {
       case UNDEFINED_MASK:
         return "undefined";
       case UNKNOWN_MASK:
-        return "unknown";
+        return "?";
       case TYPEVAR_MASK:
         return T;
       default: // Must be a union type.

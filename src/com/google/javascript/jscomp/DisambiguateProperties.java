@@ -45,6 +45,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
 
 /**
  * DisambiguateProperties renames properties to disambiguate between unrelated
@@ -78,6 +79,7 @@ class DisambiguateProperties<T> implements CompilerPass {
 
   private static final Logger logger = Logger.getLogger(
       DisambiguateProperties.class.getName());
+  private static final Pattern NONWORD_PATTERN = Pattern.compile("[^\\w$]");
 
   static class Warnings {
     // TODO(user): {1} and {2} are not exactly useful for most people.
@@ -148,7 +150,7 @@ class DisambiguateProperties<T> implements CompilerPass {
     /** Returns the types on which this field is referenced. */
     UnionFind<T> getTypes() {
       if (types == null) {
-        types = new StandardUnionFind<T>();
+        types = new StandardUnionFind<>();
       }
       return types;
     }
@@ -279,7 +281,7 @@ class DisambiguateProperties<T> implements CompilerPass {
   static DisambiguateProperties<JSType> forJSTypeSystem(
       AbstractCompiler compiler,
       Map<String, CheckLevel> propertiesToErrorFor) {
-    return new DisambiguateProperties<JSType>(
+    return new DisambiguateProperties<>(
         compiler, new JSTypeSystem(compiler), propertiesToErrorFor);
   }
 
@@ -362,7 +364,7 @@ class DisambiguateProperties<T> implements CompilerPass {
   /** Tracks the current type system scope while traversing. */
   private abstract class AbstractScopingCallback implements ScopedCallback {
     protected final Stack<StaticScope<T>> scopes =
-        new Stack<StaticScope<T>>();
+        new Stack<>();
 
     @Override
     public boolean shouldTraverse(NodeTraversal t, Node n, Node parent) {
@@ -631,7 +633,7 @@ class DisambiguateProperties<T> implements CompilerPass {
       if ("{...}".equals(typeName)) {
         newName = name;
       } else {
-        newName = typeName.replaceAll("[^\\w$]", "_") + "$" + name;
+        newName = NONWORD_PATTERN.matcher(typeName).replaceAll("_") + '$' + name;
       }
 
       for (T type : set) {
@@ -798,7 +800,7 @@ class DisambiguateProperties<T> implements CompilerPass {
       return ImmutableSet.copyOf(getTypesToSkipForTypeNonUnion(type));
     }
 
-    private Set<JSType> getTypesToSkipForTypeNonUnion(JSType type) {
+    private static Set<JSType> getTypesToSkipForTypeNonUnion(JSType type) {
       Set<JSType> types = Sets.newHashSet();
       JSType skipType = type;
       while (skipType != null) {

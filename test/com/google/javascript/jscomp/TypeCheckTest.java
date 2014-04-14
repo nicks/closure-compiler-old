@@ -6296,22 +6296,21 @@ public class TypeCheckTest extends CompilerTypeTestCase {
   }
 
   public void testImplicitCast() throws Exception {
-    testTypes("/** @constructor */ function Element() {};\n" +
+    testTypesWithExterns("/** @constructor */ function Element() {};\n" +
              "/** @type {string}\n" +
              "  * @implicitCast */" +
              "Element.prototype.innerHTML;",
-             "(new Element).innerHTML = new Array();", null, false);
+             "(new Element).innerHTML = new Array();");
   }
 
   public void testImplicitCastSubclassAccess() throws Exception {
-    testTypes("/** @constructor */ function Element() {};\n" +
+    testTypesWithExterns("/** @constructor */ function Element() {};\n" +
              "/** @type {string}\n" +
              "  * @implicitCast */" +
              "Element.prototype.innerHTML;" +
              "/** @constructor \n @extends Element */" +
              "function DIVElement() {};",
-             "(new DIVElement).innerHTML = new Array();",
-             null, false);
+             "(new DIVElement).innerHTML = new Array();");
   }
 
   public void testImplicitCastNotInExterns() throws Exception {
@@ -7341,6 +7340,20 @@ public class TypeCheckTest extends CompilerTypeTestCase {
         "actual parameter 1 of use does not match formal parameter\n" +
         "found   : number\n" +
         "required: string");
+  }
+
+  public void testBug13641083a() throws Exception {
+    testTypes(
+        "/** @constructor @struct */ function C() {};" +
+        "new C().bar;",
+        TypeCheck.INEXISTENT_PROPERTY);
+  }
+
+  public void testBug13641083b() throws Exception {
+    testTypes(
+        "/** @type {?} */ var C;" +
+        "C.bar + 1;",
+        TypeCheck.POSSIBLE_INEXISTENT_PROPERTY);
   }
 
   public void testTypedefBeforeUse() throws Exception {
@@ -9589,12 +9602,12 @@ public class TypeCheckTest extends CompilerTypeTestCase {
   public void testStubConstructorImplementingInterface() throws Exception {
     // This does not throw a warning for unimplemented property because Foo is
     // just a stub.
-    testTypes(
+    testTypesWithExterns(
         // externs
         "/** @interface */ function Int() {}\n" +
         "/** @desc description */Int.prototype.foo = function() {};" +
         "/** @constructor \n @implements {Int} */ var Foo;\n",
-        "", null, false);
+        "");
   }
 
   public void testObjectLiteral() throws Exception {
@@ -9994,14 +10007,15 @@ public class TypeCheckTest extends CompilerTypeTestCase {
   }
 
   public void testInterfaceExtendsLoop() throws Exception {
-    // TODO(user): This should give a cycle in inheritance graph error,
-    // not a cannot resolve error.
+    // TODO(nicksantos): This should emit a warning. This test is still
+    // useful to ensure the compiler doesn't crash.
     testClosureTypesMultipleWarnings(
         suppressMissingProperty("foo") +
             "/** @interface \n * @extends {F} */var G = function() {};" +
-            "/** @interface \n * @extends {G} */var F = function() {};",
-        Lists.newArrayList(
-            "Could not resolve type in @extends tag of G"));
+            "/** @interface \n * @extends {G} */var F = function() {};" +
+            "/** @constructor \n * @implements {F} */var H = function() {};" +
+        "alert((new H).foo);",
+        Lists.<String>newArrayList());
   }
 
   public void testConversionFromInterfaceToRecursiveConstructor()
@@ -10859,14 +10873,12 @@ public class TypeCheckTest extends CompilerTypeTestCase {
 
   public void testMissingProperty29() throws Exception {
     // This used to emit a warning.
-    testTypes(
+    testTypesWithExterns(
         // externs
         "/** @constructor */ var Foo;" +
         "Foo.prototype.opera;" +
         "Foo.prototype.opera.postError;",
-        "",
-        null,
-        false);
+        "");
   }
 
   public void testMissingProperty30() throws Exception {
@@ -11211,7 +11223,7 @@ public class TypeCheckTest extends CompilerTypeTestCase {
   }
 
   public void testUpdateParameterTypeOnClosure() throws Exception {
-    testTypes(
+    testTypesWithExterns(
         "/**\n" +
         "* @constructor\n" +
         "* @param {*=} opt_value\n" +
@@ -11233,9 +11245,7 @@ public class TypeCheckTest extends CompilerTypeTestCase {
         "* @param {function(): boolean} fn\n" +
         "*/\n" +
         "function f(fn) {}\n" +
-        "f(function() { });\n",
-        null,
-        false);
+        "f(function() { });\n");
   }
 
   public void testTemplatedThisType1() throws Exception {
@@ -11643,6 +11653,49 @@ public class TypeCheckTest extends CompilerTypeTestCase {
         "assignment to property x of C\n" +
         "found   : number\n" +
         "required: undefined");
+  }
+
+  public void testTemplateType21() throws Exception {
+    // "this" types is inferred when the parameters are declared.
+    testTypes(
+        "/** @interface @template T */ function A() {}\n" +
+        "/** @constructor @implements {A.<Foo>} */\n" +
+        "function Foo() {}\n" +
+        "/** @constructor @implements {A.<Bar>} */\n" +
+        "function Bar() {}\n" +
+        "/** @type {!Foo} */\n" +
+        "var x = new Bar();\n",
+        "initializing variable\n" +
+        "found   : Bar\n" +
+        "required: Foo");
+  }
+
+  public void testTemplateType22() throws Exception {
+    // "this" types is inferred when the parameters are declared.
+    testTypes(
+        "/** @interface @template T */ function A() {}\n" +
+        "/** @interface @template T */ function B() {}\n" +
+        "/** @constructor @implements {A.<Foo>} */\n" +
+        "function Foo() {}\n" +
+        "/** @constructor @implements {B.<Foo>} */\n" +
+        "function Bar() {}\n" +
+        "/** @constructor @implements {B.<Foo>} */\n" +
+        "function Qux() {}\n" +
+        "/** @type {!Qux} */\n" +
+        "var x = new Bar();\n",
+        "initializing variable\n" +
+        "found   : Bar\n" +
+        "required: Qux");
+  }
+
+  public void testTemplateType23() throws Exception {
+    // "this" types is inferred when the parameters are declared.
+    testTypes(
+        "/** @interface @template T */ function A() {}\n" +
+        "/** @constructor @implements {A.<Foo>} */\n" +
+        "function Foo() {}\n" +
+        "/** @type {!Foo} */\n" +
+        "var x = new Foo();\n");
   }
 
   public void testTemplateTypeWithUnresolvedType() throws Exception {
@@ -12966,7 +13019,7 @@ public class TypeCheckTest extends CompilerTypeTestCase {
   }
 
   private void testTypes(String js, DiagnosticType type) throws Exception {
-    testTypes(js, type.format(), false);
+    testTypes(js, type, false);
   }
 
   private void testClosureTypes(String js, String description)
@@ -13049,6 +13102,43 @@ public class TypeCheckTest extends CompilerTypeTestCase {
     if (description != null && !isError) {
       assertTrue("expected a warning", warnings.length > 0);
       assertEquals(description, warnings[0].description);
+      warnings = Arrays.asList(warnings).subList(1, warnings.length).toArray(
+          new JSError[warnings.length - 1]);
+    }
+    if (warnings.length > 0) {
+      fail("unexpected warnings(s):\n" + Joiner.on("\n").join(warnings));
+    }
+  }
+
+  void testTypes(String js, DiagnosticType diagnosticType, boolean isError)
+      throws Exception {
+    testTypes(DEFAULT_EXTERNS, js, diagnosticType, isError);
+  }
+
+  void testTypesWithExterns(String externs, String js) throws Exception {
+    testTypes(externs, js, (String)null, false);
+  }
+
+  void testTypes(
+      String externs, String js, DiagnosticType diagnosticType, boolean isError)
+      throws Exception {
+    parseAndTypeCheck(externs, js);
+
+    JSError[] errors = compiler.getErrors();
+    if (diagnosticType != null && isError) {
+      assertTrue("expected an error", errors.length > 0);
+      assertEquals(diagnosticType, errors[0].getType());
+      errors = Arrays.asList(errors).subList(1, errors.length).toArray(
+          new JSError[errors.length - 1]);
+    }
+    if (errors.length > 0) {
+      fail("unexpected error(s):\n" + Joiner.on("\n").join(errors));
+    }
+
+    JSError[] warnings = compiler.getWarnings();
+    if (diagnosticType != null && !isError) {
+      assertTrue("expected a warning", warnings.length > 0);
+      assertEquals(diagnosticType, warnings[0].getType());
       warnings = Arrays.asList(warnings).subList(1, warnings.length).toArray(
           new JSError[warnings.length - 1]);
     }

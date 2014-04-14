@@ -47,7 +47,7 @@ public class DotFormatter {
   private static final String LINE = " -- ";
 
   // stores the current assignment of node to keys
-  private final HashMap<Node, Integer> assignments = new HashMap<Node, Integer>();
+  private final HashMap<Node, Integer> assignments = new HashMap<>();
 
   // key count in order to assign a unique key to each node
   private int keyCount = 0;
@@ -210,7 +210,7 @@ public class DotFormatter {
     return key;
   }
 
-  private String name(Node n) {
+  private static String name(Node n) {
     int type = n.getType();
     switch (type) {
       case Token.VOID:
@@ -221,7 +221,7 @@ public class DotFormatter {
     }
   }
 
-  private String formatNodeName(Integer key) {
+  private static String formatNodeName(Integer key) {
     return "node" + key;
   }
 

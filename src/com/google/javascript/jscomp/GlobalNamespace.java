@@ -68,10 +68,10 @@ class GlobalNamespace
   private int currentPreOrderIndex = 0;
 
   /** Global namespace tree */
-  private List<Name> globalNames = new ArrayList<Name>();
+  private List<Name> globalNames = new ArrayList<>();
 
   /** Maps names (e.g. "a.b.c") to nodes in the global namespace tree */
-  private Map<String, Name> nameMap = new HashMap<String, Name>();
+  private Map<String, Name> nameMap = new HashMap<>();
 
   /**
    * Creates an instance that may emit warnings when building the namespace.
@@ -245,7 +245,7 @@ class GlobalNamespace
    * @param name A variable or qualified property name (e.g. "a" or "a.b.c.d")
    * @return The top variable name (e.g. "a")
    */
-  private String getTopVarName(String name) {
+  private static String getTopVarName(String name) {
     int firstDotIndex = name.indexOf('.');
     return firstDotIndex == -1 ? name : name.substring(0, firstDotIndex);
   }
@@ -272,7 +272,7 @@ class GlobalNamespace
    * @param s A scope
    * @return Whether the scope is the global scope
    */
-  private boolean isGlobalScope(Scope s) {
+  private static boolean isGlobalScope(Scope s) {
     return s.getParent() == null;
   }
 
@@ -927,7 +927,7 @@ class GlobalNamespace
 
     Name addProperty(String name, boolean inExterns) {
       if (props == null) {
-        props = new ArrayList<Name>();
+        props = new ArrayList<>();
       }
       Name node = new Name(name, this, inExterns);
       props.add(node);

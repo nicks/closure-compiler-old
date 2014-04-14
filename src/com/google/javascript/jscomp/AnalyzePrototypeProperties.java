@@ -195,7 +195,7 @@ class AnalyzePrototypeProperties implements CompilerPass {
     //    name are given a special [anonymous] context.
     // 2) Every assignment of a prototype property of a non-function is
     //    given a name context. These contexts do not have scopes.
-    private final Stack<NameContext> symbolStack = new Stack<NameContext>();
+    private final Stack<NameContext> symbolStack = new Stack<>();
 
     @Override
     public void enterScope(NodeTraversal t) {
@@ -559,13 +559,13 @@ class AnalyzePrototypeProperties implements CompilerPass {
 
   private static enum SymbolType {
     PROPERTY,
-    VAR;
+    VAR
   }
 
   /**
    * A function initialized as a VAR statement or a function declaration.
    */
-  class GlobalFunction implements Symbol {
+  static class GlobalFunction implements Symbol {
     private final Node nameNode;
     private final Var var;
     private final JSModule module;
@@ -754,7 +754,7 @@ class AnalyzePrototypeProperties implements CompilerPass {
     final String name;
 
     private boolean referenced = false;
-    private final Deque<Symbol> declarations = new ArrayDeque<Symbol>();
+    private final Deque<Symbol> declarations = new ArrayDeque<>();
     private JSModule deepestCommonModuleRef = null;
 
     // True if this property is a function that reads a variable from an

@@ -53,7 +53,7 @@ import java.util.Map;
  */
 public class Scope
     implements StaticScope<JSType>, StaticSymbolTable<Scope.Var, Scope.Var> {
-  private final Map<String, Var> vars = new LinkedHashMap<String, Var>();
+  private final Map<String, Var> vars = new LinkedHashMap<>();
   private final Scope parent;
   private final int depth;
   private final Node rootNode;
@@ -211,7 +211,12 @@ public class Scope
      * based on the value reported by {@code NodeUtil}.
      */
     public boolean isConst() {
-      return nameNode != null && NodeUtil.isConstantName(nameNode);
+      if (nameNode == null) {
+        return false;
+      }
+
+      return nameNode.getBooleanProp(Node.IS_CONSTANT_VAR) ||
+          nameNode.getBooleanProp(Node.IS_CONSTANT_NAME);
     }
 
     /**
@@ -492,7 +497,7 @@ public class Scope
    */
   Var declare(String name, Node nameNode,
       JSType type, CompilerInput input, boolean inferred) {
-    Preconditions.checkState(name != null && name.length() > 0);
+    Preconditions.checkState(name != null && !name.isEmpty());
 
     // Make sure that it's declared only once
     Preconditions.checkState(vars.get(name) == null);

@@ -270,7 +270,7 @@ public class JSModuleGraph {
     if (deps != null) {
       return deps;
     }
-    deps = new TreeSet<JSModule>(new InverseDepthComparator());
+    deps = new TreeSet<>(new InverseDepthComparator());
     addDeps(deps, m);
     dependencyMap.put(m, deps);
     return deps;
@@ -279,7 +279,7 @@ public class JSModuleGraph {
   /**
    * Adds a module's transitive dependencies to a set.
    */
-  private void addDeps(Set<JSModule> deps, JSModule m) {
+  private static void addDeps(Set<JSModule> deps, JSModule m) {
     for (JSModule dep : m.getDependencies()) {
       deps.add(dep);
       addDeps(deps, dep);
@@ -371,7 +371,7 @@ public class JSModuleGraph {
           MissingModuleException {
 
     SortedDependencies<CompilerInput> sorter =
-        new SortedDependencies<CompilerInput>(inputs);
+        new SortedDependencies<>(inputs);
     Iterable<CompilerInput> entryPointInputs = createEntryPointInputs(
         depOptions, inputs, sorter);
 
@@ -496,14 +496,14 @@ public class JSModuleGraph {
    * A module depth comparator that considers a deeper module to be "less than"
    * a shallower module. Uses module names to consistently break ties.
    */
-  private class InverseDepthComparator implements Comparator<JSModule> {
+  private static class InverseDepthComparator implements Comparator<JSModule> {
     @Override
     public int compare(JSModule m1, JSModule m2) {
       return depthCompare(m2, m1);
     }
   }
 
-  private int depthCompare(JSModule m1, JSModule m2) {
+  private static int depthCompare(JSModule m1, JSModule m2) {
     if (m1 == m2) {
       return 0;
     }

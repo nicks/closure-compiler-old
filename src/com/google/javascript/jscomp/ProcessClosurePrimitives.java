@@ -127,6 +127,10 @@ class ProcessClosurePrimitives extends AbstractPostOrderCallback
       "JSC_INVALID_FORWARD_DECLARE",
       "Malformed goog.forwardDeclaration");
 
+  static final DiagnosticType USE_OF_GOOG_BASE = DiagnosticType.disabled(
+      "JSC_USE_OF_GOOG_BASE",
+      "goog.base is not compatible with ES5 strict mode.");
+
   /** The root Closure namespace */
   static final String GOOG = "goog";
 
@@ -507,6 +511,9 @@ class ProcessClosurePrimitives extends AbstractPostOrderCallback
     // Most of the logic here is just to make sure the AST's
     // structure is what we expect it to be.
 
+    // If requested report uses of goog.base.
+    t.report(n, USE_OF_GOOG_BASE);
+
     Node callee = n.getFirstChild();
     Node thisArg = callee.getNext();
     if (thisArg == null || !thisArg.isThis()) {
@@ -521,7 +528,7 @@ class ProcessClosurePrimitives extends AbstractPostOrderCallback
     }
 
     String enclosingQname = enclosingFnNameNode.getQualifiedName();
-    if (enclosingQname.indexOf(".prototype.") == -1) {
+    if (!enclosingQname.contains(".prototype.")) {
       // Handle constructors.
       Node enclosingParent = enclosingFnNameNode.getParent();
       Node maybeInheritsExpr = (enclosingParent.isAssign() ?
@@ -632,7 +639,7 @@ class ProcessClosurePrimitives extends AbstractPostOrderCallback
     }
 
     String enclosingQname = enclosingFnNameNode.getQualifiedName();
-    if (enclosingQname.indexOf(".prototype.") == -1) {
+    if (!enclosingQname.contains(".prototype.")) {
       // Handle constructors.
 
       // Check if this is some other "base" method.
@@ -759,7 +766,7 @@ class ProcessClosurePrimitives extends AbstractPostOrderCallback
    * Processes the goog.inherits call.
    */
   private void processInheritsCall(NodeTraversal t, Node n) {
-    if (n.getChildCount() == 3 && t.inGlobalScope()) {
+    if (n.getChildCount() == 3) {
       Node subClass = n.getChildAtIndex(1);
       Node superClass = subClass.getNext();
       if (subClass.isUnscopedQualifiedName() &&
@@ -773,7 +780,7 @@ class ProcessClosurePrimitives extends AbstractPostOrderCallback
    * Returns the qualified name node of the function whose scope we're in,
    * or null if it cannot be found.
    */
-  private Node getEnclosingDeclNameNode(NodeTraversal t) {
+  private static Node getEnclosingDeclNameNode(NodeTraversal t) {
     Node scopeRoot = t.getScopeRoot();
     if (NodeUtil.isFunctionDeclaration(scopeRoot)) {
       // function x() {...}
@@ -896,7 +903,7 @@ class ProcessClosurePrimitives extends AbstractPostOrderCallback
             errors.add(key);
           }
         }
-        if (errors.size() != 0) {
+        if (!errors.isEmpty()) {
           compiler.report(
             t.makeError(n, INVALID_CSS_RENAMING_MAP, errors.toString()));
         }
@@ -919,7 +926,7 @@ class ProcessClosurePrimitives extends AbstractPostOrderCallback
             }
           }
         }
-        if (errors.size() != 0) {
+        if (!errors.isEmpty()) {
           compiler.report(
             t.makeError(n, INVALID_CSS_RENAMING_MAP, errors.toString()));
         }
@@ -1512,7 +1519,7 @@ class ProcessClosurePrimitives extends AbstractPostOrderCallback
   /**
    * Information required to create a {@code MISSING_PROVIDE_ERROR} warning.
    */
-  private class UnrecognizedRequire {
+  private static class UnrecognizedRequire {
     final Node requireNode;
     final String namespace;
     final String inputName;

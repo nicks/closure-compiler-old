@@ -48,10 +48,10 @@ public class JSModule implements DependencyInfo, Serializable {
   private final String name;
 
   /** Source code inputs */
-  private final List<CompilerInput> inputs = new ArrayList<CompilerInput>();
+  private final List<CompilerInput> inputs = new ArrayList<>();
 
   /** Modules that this module depends on */
-  private final List<JSModule> deps = new ArrayList<JSModule>();
+  private final List<JSModule> deps = new ArrayList<>();
 
   private int depth;
   /**
@@ -72,7 +72,7 @@ public class JSModule implements DependencyInfo, Serializable {
 
   @Override
   public List<String> getProvides() {
-    return ImmutableList.<String>of(name);
+    return ImmutableList.of(name);
   }
 
   @Override
@@ -178,7 +178,7 @@ public class JSModule implements DependencyInfo, Serializable {
   public Set<JSModule> getAllDependencies() {
     Set<JSModule> allDeps = Sets.newHashSet(deps);
     List<JSModule> workList = Lists.newArrayList(deps);
-    while (workList.size() > 0) {
+    while (!workList.isEmpty()) {
       JSModule module = workList.remove(workList.size() - 1);
       for (JSModule dep : module.getDependencies()) {
         if (allDeps.add(dep)) {
@@ -261,8 +261,8 @@ public class JSModule implements DependencyInfo, Serializable {
     // Sort the JSModule in this order.
     try {
       List<CompilerInput> sortedList =
-          (new SortedDependencies<CompilerInput>(
-              Collections.<CompilerInput>unmodifiableList(inputs)))
+          (new SortedDependencies<>(
+              Collections.unmodifiableList(inputs)))
           .getSortedList();
       inputs.clear();
       inputs.addAll(sortedList);
@@ -283,7 +283,7 @@ public class JSModule implements DependencyInfo, Serializable {
   public static JSModule[] sortJsModules(Collection<JSModule> modules)
       throws CircularDependencyException {
     // Sort the JSModule in this order.
-    List<JSModule> sortedList = (new SortedDependencies<JSModule>(
+    List<JSModule> sortedList = (new SortedDependencies<>(
             Lists.newArrayList(modules))).getSortedList();
     return sortedList.toArray(new JSModule[sortedList.size()]);
   }

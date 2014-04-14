@@ -309,7 +309,7 @@ class InlineFunctions implements SpecializationAwareCompilerPass {
    * @param fnNode The function to inspect.
    * @return Whether the function has parameters, var, or function declarations.
    */
-  private boolean hasLocalNames(Node fnNode) {
+  private static boolean hasLocalNames(Node fnNode) {
     Node block = NodeUtil.getFunctionBody(fnNode);
     return NodeUtil.getFunctionParameters(fnNode).hasChildren()
         || NodeUtil.has(
@@ -363,7 +363,7 @@ class InlineFunctions implements SpecializationAwareCompilerPass {
    */
   private interface CallVisitorCallback {
     public void visitCallSite(
-        NodeTraversal t, Node callNode, Node parent, FunctionState fs);
+        NodeTraversal t, Node callNode, FunctionState fs);
   }
 
   /**
@@ -408,9 +408,10 @@ class InlineFunctions implements SpecializationAwareCompilerPass {
 
           if (name != null) {
             FunctionState fs = functionMap.get(name);
+
             // Only visit call-sites for functions that can be inlined.
             if (fs != null) {
-              callback.visitCallSite(t, n, parent, fs);
+              callback.visitCallSite(t, n, fs);
             }
           }
           break;
@@ -481,7 +482,7 @@ class InlineFunctions implements SpecializationAwareCompilerPass {
 
     @Override
     public void visitCallSite(
-        NodeTraversal t, Node callNode, Node parent, FunctionState fs) {
+        NodeTraversal t, Node callNode, FunctionState fs) {
       maybeAddReference(t, fs, callNode, t.getModule());
     }
 
@@ -526,15 +527,16 @@ class InlineFunctions implements SpecializationAwareCompilerPass {
         }
       }
 
+      Reference candidate = new Reference(callNode, t.getScope(), module, mode);
       CanInlineResult result = injector.canInlineReferenceToFunction(
-          t, callNode, fs.getFn().getFunctionNode(),
-          fs.getNamesToAlias(), mode, fs.getReferencesThis(),
+          candidate, fs.getFn().getFunctionNode(),
+          fs.getNamesToAlias(), fs.getReferencesThis(),
           fs.hasInnerFunctions());
       if (result != CanInlineResult.NO) {
         // Yeah!
-        boolean decompose =
-          (result == CanInlineResult.AFTER_PREPARATION);
-        fs.addReference(new Reference(callNode, module, mode, decompose));
+        candidate.setRequiresDecomposition(
+            result == CanInlineResult.AFTER_PREPARATION);
+        fs.addReference(candidate);
         return true;
       }
 
@@ -601,10 +603,11 @@ class InlineFunctions implements SpecializationAwareCompilerPass {
 
     @Override
     public void visitCallSite(
-        NodeTraversal t, Node callNode, Node parent, FunctionState fs) {
+        NodeTraversal t, Node callNode, FunctionState fs) {
       Preconditions.checkState(fs.hasExistingFunctionDefinition());
       if (fs.canInline()) {
         Reference ref = fs.getReference(callNode);
+
         // There are two cases ref can be null: if the call site was introduce
         // because it was part of a function that was inlined during this pass
         // or if the call site was trimmed from the list of references because
@@ -620,7 +623,7 @@ class InlineFunctions implements SpecializationAwareCompilerPass {
             }
           }
 
-          inlineFunction(t, callNode, fs, ref.mode);
+          inlineFunction(t, ref, fs);
           // Keep track of references that have been inlined so that
           // we can verify that none have been missed.
           ref.inlined = true;
@@ -632,13 +635,13 @@ class InlineFunctions implements SpecializationAwareCompilerPass {
      * Inline a function into the call site.
      */
     private void inlineFunction(
-        NodeTraversal t, Node callNode, FunctionState fs, InliningMode mode) {
+        NodeTraversal t, Reference ref, FunctionState fs) {
       Function fn = fs.getFn();
       String fnName = fn.getName();
       Node fnNode = fs.getSafeFnNode();
 
-      Node newExpr = injector.inline(callNode, fnName, fnNode, mode);
-      if (!newExpr.isEquivalentTo(callNode)) {
+      Node newExpr = injector.inline(ref, fnName, fnNode);
+      if (!newExpr.isEquivalentTo(ref.callNode)) {
         t.getCompiler().reportChangeToEnclosingScope(newExpr);
       }
       t.getCompiler().addToDebugLog("Inlined function: " + fn.getName());
@@ -781,7 +784,7 @@ class InlineFunctions implements SpecializationAwareCompilerPass {
   /**
    * @see #findCalledFunctions(Node)
    */
-  private void findCalledFunctions(
+  private static void findCalledFunctions(
       Node node, Set<String> changed) {
     Preconditions.checkArgument(changed != null);
     // For each referenced function, add a new reference
@@ -805,7 +808,7 @@ class InlineFunctions implements SpecializationAwareCompilerPass {
       if (fs.canInline()) {
         for (Reference ref : fs.getReferences()) {
           if (ref.requiresDecomposition) {
-            injector.maybePrepareCall(ref.callNode);
+            injector.maybePrepareCall(ref);
           }
         }
       }
@@ -1073,7 +1076,7 @@ class InlineFunctions implements SpecializationAwareCompilerPass {
   }
 
   /** FunctionExpression implementation of the Function interface */
-  private class FunctionExpression implements Function {
+  private static class FunctionExpression implements Function {
     private final Node fn;
     private final String fakeName;
 
@@ -1106,13 +1109,17 @@ class InlineFunctions implements SpecializationAwareCompilerPass {
 
   }
 
-  class Reference extends FunctionInjector.Reference {
-    final boolean requiresDecomposition;
+  static class Reference extends FunctionInjector.Reference {
+    boolean requiresDecomposition = false;
     boolean inlined = false;
     Reference(
-        Node callNode, JSModule module, InliningMode mode, boolean decompose) {
-      super(callNode, module, mode);
-      this.requiresDecomposition = decompose;
+        Node callNode, Scope scope, JSModule module,
+        InliningMode mode) {
+      super(callNode, scope, module, mode);
+    }
+
+    void setRequiresDecomposition(boolean newVal) {
+      this.requiresDecomposition = newVal;
     }
   }
 }

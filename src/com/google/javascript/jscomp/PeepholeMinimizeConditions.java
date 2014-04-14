@@ -223,7 +223,7 @@ class PeepholeMinimizeConditions
     return n;
   }
 
-  private boolean statementMustExitParent(Node n) {
+  private static boolean statementMustExitParent(Node n) {
     switch (n.getType()) {
       case Token.THROW:
       case Token.RETURN:
@@ -361,7 +361,7 @@ class PeepholeMinimizeConditions
   /**
    * @return n or the node following any following finally nodes.
    */
-  Node skipFinallyNodes(Node n) {
+  static Node skipFinallyNodes(Node n) {
     while (n != null && NodeUtil.isTryFinallyNode(n.getParent(), n)) {
       n = ControlFlowAnalysis.computeFollowNode(n);
     }
@@ -380,7 +380,7 @@ class PeepholeMinimizeConditions
             || getExceptionHandler(nodeThis) == getExceptionHandler(nodeThat));
   }
 
-  boolean isExceptionPossible(Node n) {
+  static boolean isExceptionPossible(Node n) {
     // TODO(johnlenz): maybe use ControlFlowAnalysis.mayThrowException?
     Preconditions.checkState(n.isReturn()
         || n.isThrow());
@@ -389,7 +389,7 @@ class PeepholeMinimizeConditions
             && !NodeUtil.isLiteralValue(n.getLastChild(), true));
   }
 
-  Node getExceptionHandler(Node n) {
+  static Node getExceptionHandler(Node n) {
     return ControlFlowAnalysis.getExceptionHandler(n);
   }
 
@@ -1013,11 +1013,22 @@ class PeepholeMinimizeConditions
         right = performConditionSubstitutions(right);
 
         // Remove useless conditionals
-        // Handle four cases:
+        // Handle the following cases:
         //   x || false --> x
-        //   x || true  --> true
         //   x && true --> x
+        // This works regardless of whether x has side effects.
+        //
+        // If x does not have side effects:
+        //   x || true  --> true
         //   x && false  --> false
+        //
+        // If x may have side effects:
+        //   x || true  --> x,true
+        //   x && false  --> x,false
+        //
+        // In the last two cases, code size may increase slightly (adding
+        // some parens because the comma operator has a low precedence) but
+        // the new AST is easier for other passes to handle.
         TernaryValue rightVal = NodeUtil.getPureBooleanValue(right);
         if (NodeUtil.getPureBooleanValue(right) != TernaryValue.UNKNOWN) {
           int type = n.getType();
@@ -1031,6 +1042,11 @@ class PeepholeMinimizeConditions
             replacement = left;
           } else if (!mayHaveSideEffects(left)) {
             replacement = right;
+          } else {
+            // expr_with_sideeffects || true  =>  expr_with_sideeffects, true
+            // expr_with_sideeffects && false  =>  expr_with_sideeffects, false
+            n.detachChildren();
+            replacement = IR.comma(left, right);
           }
 
           if (replacement != null) {

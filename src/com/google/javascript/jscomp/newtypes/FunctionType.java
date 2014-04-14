@@ -298,11 +298,11 @@ public class FunctionType {
       //  */
       // Foo.prototype.method = function(x) {};
 
-      // TODO(user): This also comes up in inheritance of classes with
+      // TODO(dimvar): This also comes up in inheritance of classes with
       // polymorphic methods; fix for that.
       return true;
     }
-    Preconditions.checkState(!other.isGeneric()); // TODO(user): implement it
+    Preconditions.checkState(!other.isGeneric()); // TODO(dimvar): implement it
     FunctionTypeBuilder builder = new FunctionTypeBuilder();
     int i = 0;
     for (; i < other.requiredFormals.size(); i++) {
@@ -528,8 +528,8 @@ public class FunctionType {
     Preconditions.checkState(outerVarPreconditions.isEmpty());
     Map<String, JSType> typeMap = concreteTypes;
     if (typeParameters != null) {
-      ImmutableMap.Builder builder = ImmutableMap.builder();
-      for (String typeParam: concreteTypes.keySet()) {
+      ImmutableMap.Builder<String, JSType> builder = ImmutableMap.builder();
+      for (String typeParam : concreteTypes.keySet()) {
         if (!typeParameters.contains(typeParam)) {
           builder.put(typeParam, concreteTypes.get(typeParam));
         }
@@ -540,7 +540,7 @@ public class FunctionType {
   }
 
   public FunctionType instantiateGenerics(Map<String, JSType> typeMap) {
-    for (String typeParam: typeMap.keySet()) {
+    for (String typeParam : typeMap.keySet()) {
       Preconditions.checkState(typeParameters.contains(typeParam));
     }
     return applyInstantiation(false, typeMap);
@@ -551,7 +551,7 @@ public class FunctionType {
     if (obj == null) {
       return false;
     }
-    Preconditions.checkArgument(obj instanceof FunctionType, "obj is: " + obj);
+    Preconditions.checkArgument(obj instanceof FunctionType, "obj is: %s", obj);
     FunctionType f2 = (FunctionType) obj;
     return Objects.equal(this.requiredFormals, f2.requiredFormals) &&
         Objects.equal(this.optionalFormals, f2.optionalFormals) &&

@@ -19,8 +19,8 @@ package com.google.javascript.jscomp;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.javascript.jscomp.CodingConvention.SubclassRelationship;
-import com.google.javascript.jscomp.ReferenceCollectingCallback.ReferenceCollection;
 import com.google.javascript.jscomp.ReferenceCollectingCallback.Reference;
+import com.google.javascript.jscomp.ReferenceCollectingCallback.ReferenceCollection;
 import com.google.javascript.jscomp.Scope.Var;
 import com.google.javascript.rhino.IR;
 import com.google.javascript.rhino.Node;
@@ -52,17 +52,17 @@ class CrossModuleCodeMotion implements CompilerPass {
    * variable declarations that have to be moved into that module
    */
   private final Map<JSModule, Node> moduleVarParentMap =
-      new HashMap<JSModule, Node>();
+      new HashMap<>();
 
   /*
    * NOTE - I made this a LinkedHashMap to make testing easier. With a regular
    * HashMap, the variables may not output in a consistent order
    */
   private final Map<Scope.Var, NamedInfo> namedInfo =
-      new LinkedHashMap<Var, NamedInfo>();
+      new LinkedHashMap<>();
 
   private final Map<Node, InstanceofInfo> instanceofNodes =
-      new LinkedHashMap<Node, InstanceofInfo>();
+      new LinkedHashMap<>();
 
   private final boolean parentModuleCanSeeSymbolsDeclaredInChildren;
 
@@ -158,7 +158,7 @@ class CrossModuleCodeMotion implements CompilerPass {
 
     // information on the spot where the item was declared
     private final Deque<Declaration> declarations =
-        new ArrayDeque<Declaration>();
+        new ArrayDeque<>();
 
     // Add a Module where it is used
     void addUsedModule(JSModule m) {
@@ -208,7 +208,7 @@ class CrossModuleCodeMotion implements CompilerPass {
     }
   }
 
-  private class Declaration {
+  private static class Declaration {
     final JSModule module;
     final Node node;
 
@@ -223,7 +223,7 @@ class CrossModuleCodeMotion implements CompilerPass {
    * TODO(nicksantos) keep track of the conditionals in the ancestry, so
    * that we don't have to recrawl it.
    */
-  private boolean hasConditionalAncestor(Node n) {
+  private static boolean hasConditionalAncestor(Node n) {
     for (Node ancestor : n.getAncestors()) {
       switch (ancestor.getType()) {
         case Token.DO:
@@ -431,7 +431,7 @@ class CrossModuleCodeMotion implements CompilerPass {
   /**
    * Determines whether the given value is eligible to be moved across modules.
    */
-  private boolean canMoveValue(
+  private static boolean canMoveValue(
       ReferenceCollectingCallback collector, Scope scope, Node n) {
     // the value is only movable if it's
     // a) nothing,

@@ -585,6 +585,14 @@ class PeepholeFoldConstants extends AbstractPeepholeOptimization {
         // (FALSE || x) => x
         // (TRUE && x) => x
         result = right;
+      } else {
+        // Left side may have side effects, but we know its boolean value.
+        // e.g. true_with_sideeffects || foo() => true_with_sideeffects, foo()
+        // or: false_with_sideeffects && foo() => false_with_sideeffects, foo()
+        // This, combined with PeepholeRemoveDeadCode, helps reduce expressions
+        // like "x() || false || z()".
+        n.detachChildren();
+        result = IR.comma(left, right);
       }
     }
 
@@ -593,7 +601,7 @@ class PeepholeFoldConstants extends AbstractPeepholeOptimization {
 
     if (result != null) {
       // Fold it!
-      n.removeChild(result);
+      n.detachChildren();
       parent.replaceChild(n, result);
       reportCodeChange();
 
@@ -1277,7 +1285,7 @@ class PeepholeFoldConstants extends AbstractPeepholeOptimization {
   }
 
   /** Returns whether this node must be coerced to a string. */
-  private boolean inForcedStringContext(Node n) {
+  private static boolean inForcedStringContext(Node n) {
     if (n.getParent().isGetElem() &&
         n.getParent().getLastChild() == n) {
       return true;

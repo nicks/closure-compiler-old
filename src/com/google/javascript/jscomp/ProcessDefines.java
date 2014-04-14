@@ -240,7 +240,7 @@ class ProcessDefines implements CompilerPass {
       this.allDefines = Maps.newHashMap();
 
       assignableDefines = Maps.newHashMap();
-      assignAllowed = new ArrayDeque<Integer>();
+      assignAllowed = new ArrayDeque<>();
       assignAllowed.push(1);
 
       // Create a map of references to defines keyed by node for easy lookup
@@ -465,7 +465,7 @@ class ProcessDefines implements CompilerPass {
      * @param info Represents the define variable.
      * @param t The current traversal.
      */
-    private void setDefineInfoNotAssignable(DefineInfo info, NodeTraversal t) {
+    private static void setDefineInfoNotAssignable(DefineInfo info, NodeTraversal t) {
       info.setNotAssignable(format(REASON_DEFINE_NOT_ASSIGNABLE,
                                 t.getLineNumber(), t.getSourceName()));
     }

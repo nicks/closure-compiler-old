@@ -69,6 +69,11 @@ public class CompilerOptions implements Serializable, Cloneable {
   private LanguageMode languageOut;
 
   /**
+   * Whether to use the new parser instead of the old Rhino one.
+   */
+  boolean useNewParser;
+
+  /**
    * Whether the compiler accepts the `const' keyword.
    */
   boolean acceptConstKeyword;
@@ -337,13 +342,6 @@ public class CompilerOptions implements Serializable, Cloneable {
 
   /** Removes code that will never execute */
   public boolean removeDeadCode;
-
-  public CheckLevel checkUnreachableCode;
-
-  /** Checks for unreachable code */
-  public void setCheckUnreachableCode(CheckLevel level) {
-    this.checkUnreachableCode = level;
-  }
 
   public CheckLevel checkMissingReturn;
 
@@ -918,6 +916,7 @@ public class CompilerOptions implements Serializable, Cloneable {
   public CompilerOptions() {
     // Accepted language
     languageIn = LanguageMode.ECMASCRIPT3;
+    useNewParser = true;
 
     // Language variation
     acceptConstKeyword = false;
@@ -937,7 +936,6 @@ public class CompilerOptions implements Serializable, Cloneable {
     checkGlobalNamesLevel = CheckLevel.OFF;
     brokenClosureRequiresLevel = CheckLevel.ERROR;
     checkGlobalThisLevel = CheckLevel.OFF;
-    checkUnreachableCode = CheckLevel.OFF;
     checkMissingReturn = CheckLevel.OFF;
     checkMissingGetCssNameLevel = CheckLevel.OFF;
     checkMissingGetCssNameBlacklist = null;
@@ -1573,6 +1571,10 @@ public class CompilerOptions implements Serializable, Cloneable {
 
   public LanguageMode getLanguageOut() {
     return languageOut;
+  }
+
+  public void setUseNewParser(boolean newParser) {
+    this.useNewParser = newParser;
   }
 
   /**
@@ -2227,21 +2229,22 @@ public class CompilerOptions implements Serializable, Cloneable {
     ECMASCRIPT6_STRICT;
 
     public static LanguageMode fromString(String value) {
-      if (value.equals("ECMASCRIPT6_STRICT") ||
-          value.equals("ES6_STRICT")) {
-        return CompilerOptions.LanguageMode.ECMASCRIPT5_STRICT;
-      } else if (value.equals("ECMASCRIPT6") ||
-          value.equals("ES6")) {
-        return CompilerOptions.LanguageMode.ECMASCRIPT5;
-      } else if (value.equals("ECMASCRIPT5_STRICT") ||
-          value.equals("ES5_STRICT")) {
-        return CompilerOptions.LanguageMode.ECMASCRIPT5_STRICT;
-      } else if (value.equals("ECMASCRIPT5") ||
-          value.equals("ES5")) {
-        return CompilerOptions.LanguageMode.ECMASCRIPT5;
-      } else if (value.equals("ECMASCRIPT3") ||
-                 value.equals("ES3")) {
-        return CompilerOptions.LanguageMode.ECMASCRIPT3;
+      switch (value) {
+        case "ECMASCRIPT6_STRICT":
+        case "ES6_STRICT":
+          return LanguageMode.ECMASCRIPT5_STRICT;
+        case "ECMASCRIPT6":
+        case "ES6":
+          return LanguageMode.ECMASCRIPT5;
+        case "ECMASCRIPT5_STRICT":
+        case "ES5_STRICT":
+          return LanguageMode.ECMASCRIPT5_STRICT;
+        case "ECMASCRIPT5":
+        case "ES5":
+          return LanguageMode.ECMASCRIPT5;
+        case "ECMASCRIPT3":
+        case "ES3":
+          return LanguageMode.ECMASCRIPT3;
       }
       return null;
     }

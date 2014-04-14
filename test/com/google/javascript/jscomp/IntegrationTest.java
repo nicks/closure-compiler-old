@@ -325,6 +325,8 @@ public class IntegrationTest extends IntegrationTestCase {
   public void testInstrumentMemoryAllocationPassOn() {
     CompilerOptions options = createCompilerOptions();
     options.setInstrumentMemoryAllocations(true);
+    options.setWarningLevel(DiagnosticGroups.CHECK_USELESS_CODE, CheckLevel.OFF);
+
     test(options,
         "var obj = new Object(); " +
         "var o = {}; " +
@@ -574,12 +576,13 @@ public class IntegrationTest extends IntegrationTestCase {
   }
 
   public void testUnreachableCode() {
-    String code = "function f() { return \n 3; }";
+    String code = "function f() { return \n x(); }";
 
     CompilerOptions options = createCompilerOptions();
+    options.setWarningLevel(DiagnosticGroups.CHECK_USELESS_CODE, CheckLevel.OFF);
     testSame(options, code);
 
-    options.checkUnreachableCode = CheckLevel.ERROR;
+    options.setWarningLevel(DiagnosticGroups.CHECK_USELESS_CODE, CheckLevel.ERROR);
     test(options, code, CheckUnreachableCode.UNREACHABLE_CODE);
   }
 
@@ -1090,6 +1093,8 @@ public class IntegrationTest extends IntegrationTestCase {
 
   public void testRemoveUnreachableCode() {
     CompilerOptions options = createCompilerOptions();
+    options.setWarningLevel(DiagnosticGroups.CHECK_USELESS_CODE, CheckLevel.OFF);
+
     String code = "function f() { return; f(); }";
     testSame(options, code);
 
@@ -1171,6 +1176,77 @@ public class IntegrationTest extends IntegrationTestCase {
         "}";
 
     test(options, code, expected);
+  }
+
+  public void testDeadCodeHasNoDisambiguationSideEffects() {
+    // This test case asserts that unreachable code does not
+    // confuse the disambigation process and type inferencing.
+    CompilerOptions options = createCompilerOptions();
+
+    options.checkTypes = true;
+    options.disambiguateProperties = true;
+    options.removeDeadCode = true;
+    options.removeUnusedPrototypeProperties = true;
+    options.smartNameRemoval = true;
+    options.extraSmartNameRemoval = true;
+    options.foldConstants = true;
+    options.inlineVariables = true;
+
+    String code = "/** @constructor */ function A() {} " +
+        "A.prototype.always = function() { " +
+        "  window.console.log('AA'); " +
+        "}; " +
+        "A.prototype.sometimes = function() { " +
+        "  window.console.log('SA'); " +
+        "}; " +
+        "/** @constructor */ function B() {} " +
+        "B.prototype.always = function() { " +
+        "  window.console.log('AB'); " +
+        "};" +
+        "B.prototype.sometimes = function() { " +
+        "  window.console.log('SB'); " +
+        "};" +
+        "/** @constructor @struct @template T */ function C() {} " +
+        "/** @param {!T} x */ C.prototype.touch = function(x) { " +
+        "  return x.sometimes(); " +
+        "}; " +
+        "window['main'] = function() { " +
+        "  var a = window['a'] = new A; " +
+        "  a.always(); " +
+        "  a.sometimes(); " +
+        "  var b = window['b'] = new B; " +
+        "  b.always(); " +
+        "};" +
+        "function notCalled() { " +
+        "  var something = {}; " +
+        "  something.always(); " +
+        "  var c = new C; " +
+        "  c.touch(something);" +
+        "}";
+
+    // B.prototype.sometimes should be stripped out, as it is not used, and the
+    // type ambiguity in function notCalled is unreachable.
+    String expected = "function A() {} " +
+        "A.prototype.A_prototype$always = function() { " +
+        "  window.console.log('AA'); " +
+        "}; " +
+        "A.prototype.A_prototype$sometimes = function(){ " +
+        "  window.console.log('SA'); " +
+        "}; " +
+        "function B() {} " +
+        "B.prototype.B_prototype$always=function(){ " +
+        "  window.console.log('AB'); " +
+        "};" +
+        "window['main'] = function() { " +
+        "  var a = window['a'] = new A; " +
+        "  a.A_prototype$always(); " +
+        "  a.A_prototype$sometimes(); " +
+        "  (window['b'] = new B).B_prototype$always(); " +
+        "}";
+
+
+    test(options, code, expected);
+
   }
 
   public void testDeadAssignmentsElimination() {
@@ -1564,6 +1640,8 @@ public class IntegrationTest extends IntegrationTestCase {
     CompilerOptions options = createCompilerOptions();
     options.ideMode = true;
     options.checkTypes = true;
+    options.setWarningLevel(DiagnosticGroups.CHECK_USELESS_CODE, CheckLevel.OFF);
+
     test(options,
          "function f() { try { } catch(e) { break; } }",
          RhinoErrorReporter.PARSE_ERROR);
@@ -1871,6 +1949,25 @@ public class IntegrationTest extends IntegrationTestCase {
     testSame(options, code);
   }
 
+  public void testCheckStrictMode() {
+    CompilerOptions options = createCompilerOptions();
+    CompilationLevel.ADVANCED_OPTIMIZATIONS
+        .setOptionsForCompilationLevel(options);
+    WarningLevel.VERBOSE.setOptionsForWarningLevel(options);
+
+    externs = ImmutableList.of(
+        SourceFile.fromCode(
+            "externs", "var use; var arguments; arguments.callee;"));
+
+    String code =
+        "function App() {}\n" +
+        "App.prototype.method = function(){\n" +
+        "  use(arguments.callee)\n" +
+        "};";
+
+    test(options, code, "", StrictModeCheck.ARGUMENTS_CALLEE_FORBIDDEN);
+  }
+
   public void testIssue701() {
     // Check ASCII art in license comments.
     String ascii = "/**\n" +
@@ -2020,7 +2117,7 @@ public class IntegrationTest extends IntegrationTestCase {
 
   public void testCoaleseVariables() {
     CompilerOptions options = createCompilerOptions();
-
+    options.setWarningLevel(DiagnosticGroups.CHECK_USELESS_CODE, CheckLevel.OFF);
     options.foldConstants = false;
     options.coalesceVariableNames = true;
 
@@ -2133,7 +2230,7 @@ public class IntegrationTest extends IntegrationTestCase {
   public void testBug5786871() {
     CompilerOptions options = createCompilerOptions();
     options.ideMode = true;
-    test(options, "function () {}", RhinoErrorReporter.PARSE_ERROR);
+    testParseError(options, "function () {}");
   }
 
   public void testIssue378() {
@@ -2166,6 +2263,7 @@ public class IntegrationTest extends IntegrationTestCase {
     CompilerOptions options = createCompilerOptions();
     CompilationLevel.SIMPLE_OPTIMIZATIONS
         .setOptionsForCompilationLevel(options);
+    options.setWarningLevel(DiagnosticGroups.CHECK_USELESS_CODE, CheckLevel.OFF);
     test(options,
         "while (function () {\n" +
         " function f(){};\n" +
@@ -2178,6 +2276,8 @@ public class IntegrationTest extends IntegrationTestCase {
     CompilerOptions options = createCompilerOptions();
     CompilationLevel.SIMPLE_OPTIMIZATIONS
         .setOptionsForCompilationLevel(options);
+    options.setWarningLevel(DiagnosticGroups.CHECK_USELESS_CODE, CheckLevel.OFF);
+
     test(options,
          "function f(x) { return 1; do { x(); } while (true); }",
          "function f(a) { return 1; }");
@@ -2516,18 +2616,7 @@ public class IntegrationTest extends IntegrationTestCase {
   public void testIncompleteFunction2() {
     CompilerOptions options = createCompilerOptions();
     options.ideMode = true;
-    DiagnosticType[] warnings = new DiagnosticType[]{
-        RhinoErrorReporter.PARSE_ERROR,
-        RhinoErrorReporter.PARSE_ERROR,
-        RhinoErrorReporter.PARSE_ERROR,
-        RhinoErrorReporter.PARSE_ERROR,
-        RhinoErrorReporter.PARSE_ERROR,
-        RhinoErrorReporter.PARSE_ERROR};
-    test(options,
-        new String[] { "function hi" },
-        new String[] { "function hi() {}" },
-        warnings
-    );
+    testParseError(options, "function hi", "function hi() {}");
   }
 
   public void testSortingOff() {
@@ -2545,10 +2634,9 @@ public class IntegrationTest extends IntegrationTestCase {
   public void testUnboundedArrayLiteralInfiniteLoop() {
     CompilerOptions options = createCompilerOptions();
     options.ideMode = true;
-    test(options,
+    testParseError(options,
          "var x = [1, 2",
-         "var x = [1, 2]",
-         RhinoErrorReporter.PARSE_ERROR);
+         "var x = [1, 2]");
   }
 
   public void testProvideRequireSameFile() throws Exception {
@@ -2925,7 +3013,7 @@ public class IntegrationTest extends IntegrationTestCase {
     WarningLevel warnings = WarningLevel.VERBOSE;
     warnings.setOptionsForWarningLevel(options);
 
-    int numAdds = 4500;
+    int numAdds = 4400;
     StringBuilder original = new StringBuilder("var x = 0");
     for (int i = 0; i < numAdds; i++) {
       original.append(" + 1");

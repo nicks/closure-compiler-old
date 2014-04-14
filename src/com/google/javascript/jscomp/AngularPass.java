@@ -74,7 +74,7 @@ class AngularPass extends AbstractPostOrderCallback implements CompilerPass {
   final AbstractCompiler compiler;
 
   /** Nodes annotated with @ngInject */
-  private final List<NodeContext> injectables = new ArrayList<NodeContext>();
+  private final List<NodeContext> injectables = new ArrayList<>();
 
   public AngularPass(AbstractCompiler compiler) {
     this.compiler = compiler;
@@ -108,7 +108,7 @@ class AngularPass extends AbstractPostOrderCallback implements CompilerPass {
       Node fn = entry.getFunctionNode();
       List<Node> dependencies = createDependenciesList(fn);
       // skips entry if it does have any dependencies.
-      if (dependencies.size() == 0) {
+      if (dependencies.isEmpty()) {
         continue;
       }
       Node dependenciesArray = IR.arraylit(dependencies.toArray(
@@ -265,7 +265,7 @@ class AngularPass extends AbstractPostOrderCallback implements CompilerPass {
     return n;
   }
 
-  class NodeContext {
+  static class NodeContext {
     /** Name of the function/object. */
     private final String name;
     /** Node jsDoc is attached to. */

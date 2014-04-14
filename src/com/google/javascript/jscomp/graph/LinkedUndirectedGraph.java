@@ -43,23 +43,23 @@ public class LinkedUndirectedGraph<N, E>
 
   @Override
   public SubGraph<N, E> newSubGraph() {
-    return new SimpleSubGraph<N, E>(this);
+    return new SimpleSubGraph<>(this);
   }
 
   public static <N, E> LinkedUndirectedGraph<N, E> createWithoutAnnotations() {
-    return new LinkedUndirectedGraph<N, E>(false, false);
+    return new LinkedUndirectedGraph<>(false, false);
   }
 
   public static <N, E> LinkedUndirectedGraph<N, E> createWithNodeAnnotations() {
-    return new LinkedUndirectedGraph<N, E>(true, false);
+    return new LinkedUndirectedGraph<>(true, false);
   }
 
   public static <N, E> LinkedUndirectedGraph<N, E> createWithEdgeAnnotations() {
-    return new LinkedUndirectedGraph<N, E>(false, true);
+    return new LinkedUndirectedGraph<>(false, true);
   }
 
   public static <N, E> LinkedUndirectedGraph<N, E> create() {
-    return new LinkedUndirectedGraph<N, E>(true, true);
+    return new LinkedUndirectedGraph<>(true, true);
   }
 
   private final boolean useNodeAnnotations;
@@ -77,8 +77,8 @@ public class LinkedUndirectedGraph<N, E>
     LinkedUndirectedGraphNode<N, E> dest = getNodeOrFail(destValue);
     LinkedUndirectedGraphEdge<N, E> edge =
         useEdgeAnnotations ?
-        new AnnotatedLinkedUndirectedGraphEdge<N, E>(src, edgeValue, dest) :
-        new LinkedUndirectedGraphEdge<N, E>(src, edgeValue, dest);
+        new AnnotatedLinkedUndirectedGraphEdge<>(src, edgeValue, dest) :
+        new LinkedUndirectedGraphEdge<>(src, edgeValue, dest);
     src.getNeighborEdges().add(edge);
     dest.getNeighborEdges().add(edge);
   }
@@ -190,7 +190,7 @@ public class LinkedUndirectedGraph<N, E>
 
   @Override
   public boolean isConnected(N n1, E e, N n2) {
-    return isConnected(n1, Predicates.<E>equalTo(e), n2);
+    return isConnected(n1, Predicates.equalTo(e), n2);
   }
 
   private boolean isConnected(N n1, Predicate<E> edgePredicate, N n2) {

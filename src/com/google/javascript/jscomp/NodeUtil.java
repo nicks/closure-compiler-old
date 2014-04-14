@@ -57,7 +57,7 @@ public final class NodeUtil {
 
   /** the set of builtin constructors that don't have side effects. */
   private static final Set<String> CONSTRUCTORS_WITHOUT_SIDE_EFFECTS =
-      new HashSet<String>(Arrays.asList(
+      new HashSet<>(Arrays.asList(
         "Array",
         "Date",
         "Error",
@@ -334,7 +334,7 @@ public final class NodeUtil {
 
     String s = trimJsWhiteSpace(rawJsString);
     // return ScriptRuntime.toNumber(s);
-    if (s.length() == 0) {
+    if (s.isEmpty()) {
       return 0.0;
     }
 
@@ -1177,7 +1177,12 @@ public final class NodeUtil {
    */
   static boolean canBeSideEffected(Node n) {
     Set<String> emptySet = Collections.emptySet();
-    return canBeSideEffected(n, emptySet);
+    return canBeSideEffected(n, emptySet, null);
+  }
+
+  static boolean canBeSideEffected(
+      Node n, Set<String> knownConstants) {
+    return canBeSideEffected(n, knownConstants, null);
   }
 
   /**
@@ -1186,7 +1191,10 @@ public final class NodeUtil {
    * @return Whether the tree can be affected by side-effects or
    * has side-effects.
    */
-  static boolean canBeSideEffected(Node n, Set<String> knownConstants) {
+  // TODO(nick): Get rid of the knownConstants argument in favor of using
+  // scope with InferConsts.
+  static boolean canBeSideEffected(
+      Node n, Set<String> knownConstants, Scope scope) {
     switch (n.getType()) {
       case Token.CALL:
       case Token.NEW:
@@ -1196,7 +1204,7 @@ public final class NodeUtil {
         return true;
       case Token.NAME:
         // Non-constant names values may have been changed.
-        return !isConstantName(n)
+        return !isConstantVar(n, scope)
             && !knownConstants.contains(n.getString());
 
       // Properties on constant NAMEs can still be side-effected.
@@ -1212,7 +1220,7 @@ public final class NodeUtil {
     }
 
     for (Node c = n.getFirstChild(); c != null; c = c.getNext()) {
-      if (canBeSideEffected(c, knownConstants)) {
+      if (canBeSideEffected(c, knownConstants, scope)) {
         return true;
       }
     }
@@ -1498,7 +1506,7 @@ public final class NodeUtil {
       new MayBeStringResultPredicate();
 
   /**
-   * @returns Whether the results is possibly a string.
+   * @return Whether the results is possibly a string.
    */
   static boolean mayBeString(Node n) {
     return mayBeString(n, true);
@@ -2908,6 +2916,19 @@ public final class NodeUtil {
     return fnNode.getFirstChild().getNext();
   }
 
+  static boolean isConstantVar(Node node, Scope scope) {
+    if (isConstantName(node)) {
+      return true;
+    }
+
+    if (!node.isName() || scope == null) {
+      return false;
+    }
+
+    Scope.Var var = scope.getVar(node.getString());
+    return var != null && var.isConst();
+  }
+
   /**
    * <p>Determines whether a variable is constant:
    * <ol>
@@ -3243,7 +3264,7 @@ public final class NodeUtil {
   }
 
   /**
-   * @returns false iff the result of the expression is not consumed.
+   * @return false iff the result of the expression is not consumed.
    */
   static boolean isExpressionResultUsed(Node expr) {
     // TODO(johnlenz): consider sharing some code with trySimpleUnusedResult.
@@ -3382,7 +3403,7 @@ public final class NodeUtil {
    */
   public static Map<Node, Node> mapMainToClone(Node main, Node clone) {
     Preconditions.checkState(main.isEquivalentTo(clone));
-    Map<Node, Node> mtoc = new HashMap<Node, Node>();
+    Map<Node, Node> mtoc = new HashMap<>();
     mtoc.put(main, clone);
     mtocHelper(mtoc, main, clone);
     return mtoc;
