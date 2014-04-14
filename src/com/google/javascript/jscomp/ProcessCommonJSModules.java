@@ -238,6 +238,8 @@ public class ProcessCommonJSModules implements CompilerPass {
      * All other forms are handled by a more general algorithm.
      */
     private void processExports(Node script, String moduleName) {
+      Scope globalScope = new SyntacticScopeCreator(compiler)
+          .createScope(script, null);
       if (hasOneTopLevelModuleExportAssign()) {
         // One top-level assign: transform to
         // /** @const */ var moduleName = rhs
@@ -255,21 +257,9 @@ public class ProcessCommonJSModules implements CompilerPass {
         // it's an alias, and if it is, copy the annotation over.
         // This is a common idiom to export a set of constructors.
         if (rhsValue.isObjectLit()) {
-          Scope globalScope = new SyntacticScopeCreator(compiler)
-              .createScope(script, null);
           for (Node key = rhsValue.getFirstChild();
                key != null; key = key.getNext()) {
-            if (key.getJSDocInfo() == null
-                && key.getFirstChild().isName()) {
-              Var aliasedVar =
-                  globalScope.getVar(key.getFirstChild().getString());
-              JSDocInfo info =
-                  aliasedVar == null ? null : aliasedVar.getJSDocInfo();
-              if (info != null &&
-                  info.getVisibility() != JSDocInfo.Visibility.PRIVATE) {
-                key.setJSDocInfo(info);
-              }
-            }
+            maybeCopyJSDocForAlias(key.getFirstChild(), key, globalScope);
           }
         }
 
@@ -293,6 +283,17 @@ public class ProcessCommonJSModules implements CompilerPass {
           Node newRef = IR.name(moduleName).copyInformationFrom(ref);
           newRef.putProp(Node.ORIGINALNAME_PROP, ref.getQualifiedName());
           ref.getParent().replaceChild(ref, newRef);
+
+          // If any of these are variable aliases, copy JSDoc over.
+          Node current = newRef.getParent();
+          for (; current != null && current.isGetProp();
+               current = current.getParent()) {
+            if (current.getParent().isAssign() &&
+                current == current.getParent().getFirstChild()) {
+              maybeCopyJSDocForAlias(
+                  current.getNext(), current.getParent(), globalScope);
+            }
+          }
         }
         return;
       }
@@ -319,6 +320,29 @@ public class ProcessCommonJSModules implements CompilerPass {
           ref.putProp(Node.ORIGINALNAME_PROP, ref.getString());
           ref.setString(aliasName);
         }
+      }
+    }
+
+    /**
+     * If rValue is a simple NAME, grab the jsdoc from its variable
+     * and apply it to target.
+     */
+    private void maybeCopyJSDocForAlias(Node rValue, Node target, Scope globalScope) {
+      if (target.getJSDocInfo() != null) {
+        // If target already has JSDocInfo, don't overwrite it.
+        return;
+      }
+
+      if (!rValue.isName()) {
+        return;
+      }
+
+      String name = rValue.getString();
+      Var aliasedVar = globalScope.getVar(name);
+      JSDocInfo info = aliasedVar == null ? null : aliasedVar.getJSDocInfo();
+      if (info != null &&
+          info.getVisibility() != JSDocInfo.Visibility.PRIVATE) {
+        target.setJSDocInfo(info);
       }
     }
 

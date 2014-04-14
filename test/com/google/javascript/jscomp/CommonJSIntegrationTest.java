@@ -245,6 +245,32 @@ public class CommonJSIntegrationTest extends IntegrationTestCase {
          });
   }
 
+  public void testCrossModuleSubclass7() {
+    test(createCompilerOptions(),
+         new String[] {
+           "/** @constructor */ function Hello() {} " +
+           "exports.Hello = Hello;",
+           "var i0 = require('./i0');" +
+           "var util = {inherits: function (x, y){}};" +
+           "/**\n" +
+           " * @constructor\n" +
+           " * @extends {./i0.Hello}\n" +
+           " */\n" +
+           "function SubHello() { i0.Hello.call(this); }" +
+           "util.inherits(SubHello, i0.Hello);"
+         },
+         new String[] {
+           "var module$i0={};" +
+           "function Hello$$module$i0(){}" +
+           "module$i0.Hello = Hello$$module$i0;",
+           "var module$i1={};" +
+           "var i0$$module$i1=module$i0;" +
+           "var util$$module$i1={inherits:function(x,y){}};" +
+           "function SubHello$$module$i1(){ i0$$module$i1.Hello.call(this); }" +
+           "util$$module$i1.inherits(SubHello$$module$i1,i0$$module$i1.Hello);"
+         });
+  }
+
   @Override
   protected CompilerOptions createCompilerOptions() {
     CompilerOptions options = new CompilerOptions();
