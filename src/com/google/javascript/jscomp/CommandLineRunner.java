@@ -863,6 +863,7 @@ public class CommandLineRunner extends
     // JS externs
     "es3.js",
     "es5.js",
+    "es6.js",
     "intl.js",
 
     // Event APIs
